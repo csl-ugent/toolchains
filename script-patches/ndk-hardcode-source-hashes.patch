@@ -1,0 +1,82 @@
+diff --git a/build/tools/download-toolchain-sources.sh b/build/tools/download-toolchain-sources.sh
+index 4902a36..8bec2ba 100755
+--- a/build/tools/download-toolchain-sources.sh
++++ b/build/tools/download-toolchain-sources.sh
+@@ -163,12 +163,19 @@ toolchain_checkout ()
+     local SUBDIR=$1
+     local BRANCH=$2
+     local NAME=$3
+-    shift ; shift ; shift
++    local HASHREV=$4
++    shift ; shift ; shift ; shift
++
+     local GITOPTS="--git-dir=$CLONE_DIR/$NAME/.git"
+     log "Checking out $BRANCH branch of $NAME.git: $@"
++
+     local REVISION=origin/$BRANCH
+-    if [ -n "$GIT_DATE" ] ; then
+-        REVISION=`$GITCMD $GITOPTS rev-list -n 1 --until="$GIT_DATE" $REVISION`
++    if [ -n "$HASHREV" ]; then
++        REVISION=$HASHREV
++    else
++        if [ -n "$GIT_DATE" ] ; then
++            REVISION=`$GITCMD $GITOPTS rev-list -n 1 --until="$GIT_DATE" $REVISION`
++        fi
+     fi
+     (mkdir -p $TMPDIR/$SUBDIR/$NAME && cd $TMPDIR/$SUBDIR/$NAME && run $GITCMD $GITOPTS checkout $REVISION "$@")
+     fail_panic "Could not checkout $NAME / $@ ?"
+@@ -207,21 +214,21 @@ toolchain_clone compiler-rt
+ toolchain_clone mclinker
+ toolchain_clone yasm
+ 
+-toolchain_checkout "" $BRANCH build .
+-toolchain_checkout "" $BRANCH gmp .
+-toolchain_checkout "" $BRANCH mpfr .
+-toolchain_checkout "" $BRANCH mpc .
+-toolchain_checkout "" $BRANCH cloog .
+-toolchain_checkout "" $BRANCH isl .
+-toolchain_checkout "" $BRANCH ppl .
+-toolchain_checkout "" $BRANCH expat .
+-toolchain_checkout "" $BRANCH binutils binutils-2.21 binutils-2.23 binutils-2.24
+-toolchain_checkout "" $BRANCH gcc gcc-4.6 gcc-4.8 gcc-4.9
+-toolchain_checkout "" $BRANCH gdb gdb-7.3.x gdb-7.6 gdb-7.7
+-toolchain_checkout "" $BRANCH python Python-2.7.5
+-toolchain_checkout "" $BRANCH perl perl-5.16.2
+-toolchain_checkout "" $BRANCH mclinker .
+-toolchain_checkout "" $BRANCH yasm .
++toolchain_checkout "" $BRANCH build 75542e77b565c2af968e48c1b12b32f343d913ae .
++toolchain_checkout "" $BRANCH gmp e6b9669dafc6a5f83c80b4b4176359b78bccdc90 .
++toolchain_checkout "" $BRANCH mpfr bfcf1bfa38469208aaad8873cd4c68781061d90f .
++toolchain_checkout "" $BRANCH mpc 835d16e92eed875638a8b5d552034c3b1aae045b .
++toolchain_checkout "" $BRANCH cloog 98972d5434ffcb4d11d2c81a46600e9a1cda9110 .
++toolchain_checkout "" $BRANCH isl b05d4572958c5d497da793f3317084bab90c3033 .
++toolchain_checkout "" $BRANCH ppl 8ba1875b4c5341d902321761022a6d2a0b5b19a4 .
++toolchain_checkout "" $BRANCH expat 40172a0ae9d40a068f1e1a48ffcf6a1ccf765ed5 .
++toolchain_checkout "" $BRANCH binutils fff40e635995d00e3455f861a97d8cbf3ebb6b4e binutils-2.21 binutils-2.23 binutils-2.24
++toolchain_checkout "" $BRANCH gcc c5748954561f492fe1c4ea772e0290079af9960b gcc-4.6 gcc-4.8 gcc-4.9
++toolchain_checkout "" $BRANCH gdb 24237bc8bc3001a82d6cd9685719c4679f721792 gdb-7.3.x gdb-7.6 gdb-7.7
++toolchain_checkout "" $BRANCH python 0d4194853e08d3244931523470331c00dfb94863 Python-2.7.5
++toolchain_checkout "" $BRANCH perl 1121daca35c6c692602621eab28d4de19f0b347d perl-5.16.2 
++toolchain_checkout "" $BRANCH mclinker 5fca8b9c9c671d6c01f428c00ca131e65042a9fd .
++toolchain_checkout "" $BRANCH yasm 87c09baff80ca5bbe938392d8f320e621707f317 .
+ 
+ for LLVM_VERSION in $LLVM_VERSION_LIST; do
+     # Check-out and Adjust directory structure a bit
+@@ -231,14 +238,14 @@ for LLVM_VERSION in $LLVM_VERSION_LIST; do
+     #    will only create symbolic link when --with-polly is specified.
+     LLVM_VERSION_NO_DOT=$(echo $LLVM_VERSION | sed -e 's!\.!!g')
+     LLVM_BRANCH="release_$LLVM_VERSION_NO_DOT"
+-    toolchain_checkout "llvm-$LLVM_VERSION" $LLVM_BRANCH clang .
+-    toolchain_checkout "llvm-$LLVM_VERSION" $LLVM_BRANCH llvm .
++    toolchain_checkout "llvm-$LLVM_VERSION" $LLVM_BRANCH clang "" .
++    toolchain_checkout "llvm-$LLVM_VERSION" $LLVM_BRANCH llvm "" .
+     (cd "$TMPDIR/llvm-$LLVM_VERSION/llvm" && \
+         ln -s ../../clang tools && \
+         test -d tools/polly && mv tools/polly ..)
+     if [ "$LLVM_VERSION" != "3.1" ]; then
+         # compiler-rt only exists on and after 3.2
+-        toolchain_checkout "llvm-$LLVM_VERSION" $LLVM_BRANCH compiler-rt .
++        toolchain_checkout "llvm-$LLVM_VERSION" $LLVM_BRANCH compiler-rt "" .
+     fi
+     # In polly/utils/cloog_src, touch Makefile.in, aclocal.m4, and configure to
+     # make sure they are not regenerated.

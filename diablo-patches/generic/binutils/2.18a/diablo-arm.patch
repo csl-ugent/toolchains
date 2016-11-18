@@ -1,0 +1,406 @@
+diff --git a/bfd/elf-eh-frame.c b/bfd/elf-eh-frame.c
+index 473e890..a5bcbd6 100644
+--- a/bfd/elf-eh-frame.c
++++ b/bfd/elf-eh-frame.c
+@@ -487,6 +487,7 @@ _bfd_elf_discard_section_eh_frame
+   if (hdr_info->cies == NULL && !info->relocatable)
+     hdr_info->cies = htab_try_create (1, cie_hash, cie_eq, free);
+ 
++  goto free_no_table;
+   /* Read the frame unwind information from abfd.  */
+ 
+   REQUIRE (bfd_malloc_and_get_section (abfd, sec, &ehbuf));
+diff --git a/bfd/elf.c b/bfd/elf.c
+index 47ce148..329b1c3 100644
+--- a/bfd/elf.c
++++ b/bfd/elf.c
+@@ -830,10 +830,16 @@ _bfd_elf_make_section_from_shdr (bfd *abfd,
+     flags |= SEC_DATA;
+   if ((hdr->sh_flags & SHF_MERGE) != 0)
+     {
++      /* turn this off because diablo can't handle it */
++#if 0
+       flags |= SEC_MERGE;
+       newsect->entsize = hdr->sh_entsize;
+       if ((hdr->sh_flags & SHF_STRINGS) != 0)
+ 	flags |= SEC_STRINGS;
++#else
++      flags &= ~(SEC_MERGE | SEC_STRINGS);
++      hdr->sh_flags &= ~(SHF_MERGE | SHF_STRINGS);
++#endif
+     }
+   if (hdr->sh_flags & SHF_GROUP)
+     if (!setup_group (abfd, hdr, newsect))
+@@ -2544,10 +2550,16 @@ elf_fake_sections (bfd *abfd, asection *asect, void *failedptrarg)
+     this_hdr->sh_flags |= SHF_EXECINSTR;
+   if ((asect->flags & SEC_MERGE) != 0)
+     {
++      /* turn this off because diablo can't handle it */
++#if 0
+       this_hdr->sh_flags |= SHF_MERGE;
+       this_hdr->sh_entsize = asect->entsize;
+       if ((asect->flags & SEC_STRINGS) != 0)
+ 	this_hdr->sh_flags |= SHF_STRINGS;
++#else
++      this_hdr->sh_flags &= ~(SHF_MERGE | SHF_STRINGS);
++      asect->flags &= ~(SEC_MERGE | SEC_STRINGS);
++#endif
+     }
+   if ((asect->flags & SEC_GROUP) == 0 && elf_group_name (asect) != NULL)
+     this_hdr->sh_flags |= SHF_GROUP;
+diff --git a/gas/config/obj-elf.c b/gas/config/obj-elf.c
+index 014117a..c06c92d 100644
+--- a/gas/config/obj-elf.c
++++ b/gas/config/obj-elf.c
+@@ -1473,6 +1473,8 @@ obj_elf_version (int ignore ATTRIBUTE_UNUSED)
+   demand_empty_rest_of_line ();
+ }
+ 
++extern int size_expression;
++
+ static void
+ obj_elf_size (int ignore ATTRIBUTE_UNUSED)
+ {
+@@ -1494,7 +1496,10 @@ obj_elf_size (int ignore ATTRIBUTE_UNUSED)
+       return;
+     }
+   input_line_pointer++;
++
++  size_expression=1;
+   expression (&exp);
++  size_expression=0;
+   if (exp.X_op == O_absent)
+     {
+       as_bad (_("missing expression in .size directive"));
+@@ -1596,6 +1601,7 @@ obj_elf_type (int ignore ATTRIBUTE_UNUSED)
+   demand_empty_rest_of_line ();
+ }
+ 
++
+ static void
+ obj_elf_ident (int ignore ATTRIBUTE_UNUSED)
+ {
+diff --git a/gas/config/tc-arm.c b/gas/config/tc-arm.c
+index 7e42aa9..ff420b3 100644
+--- a/gas/config/tc-arm.c
++++ b/gas/config/tc-arm.c
+@@ -42,6 +42,8 @@
+ 
+ #include "dwarf2dbg.h"
+ 
++extern int prev_was_data;
++
+ #define WARN_DEPRECATED 1
+ 
+ #ifdef OBJ_ELF
+@@ -14168,6 +14170,7 @@ md_assemble (char *str)
+   inst.reloc.type = BFD_RELOC_UNUSED;
+ 
+   opcode = opcode_lookup (&p);
++
+   if (!opcode)
+     {
+       /* It wasn't an instruction, but it might be a register alias of
+@@ -19280,9 +19283,9 @@ arm_force_relocation (struct fix * fixp)
+     return 1;
+ 
+   /* Always generate relocations against function symbols.  */
+-  if (fixp->fx_r_type == BFD_RELOC_32
++  if (fixp->fx_r_type == BFD_RELOC_32 /*
+       && fixp->fx_addsy
+-      && (symbol_get_bfdsym (fixp->fx_addsy)->flags & BSF_FUNCTION))
++      && (symbol_get_bfdsym (fixp->fx_addsy)->flags & BSF_FUNCTION)*/)
+     return 1;
+ 
+   return generic_force_reloc (fixp);
+@@ -19339,7 +19342,7 @@ arm_fix_adjustable (fixS * fixP)
+       || fixP->fx_r_type == BFD_RELOC_ARM_LDR_PC_G0)
+     return 0;
+ 
+-  return 1;
++  return 0;
+ }
+ #endif /* defined (OBJ_ELF) || defined (OBJ_COFF) */
+ 
+diff --git a/gas/config/tc-i386.c b/gas/config/tc-i386.c
+index 5d53c5a..986036d 100644
+--- a/gas/config/tc-i386.c
++++ b/gas/config/tc-i386.c
+@@ -1651,7 +1651,8 @@ tc_i386_fix_adjustable (fixS *fixP ATTRIBUTE_UNUSED)
+       || fixP->fx_r_type == BFD_RELOC_VTABLE_ENTRY)
+     return 0;
+ #endif
+-  return 1;
++  /* Needed by DIABLO */
++  return 0;
+ }
+ 
+ static int
+@@ -1718,6 +1719,8 @@ md_assemble (line)
+   int j;
+   char mnemonic[MAX_MNEM_SIZE];
+ 
++  if (prev_was_data!=0) symbol_new ("$a", now_seg, (valueT) frag_now_fix (), frag_now);
++  prev_was_data=0;
+   /* Initialize globals.  */
+   memset (&i, '\0', sizeof (i));
+   for (j = 0; j < MAX_OPERANDS; j++)
+diff --git a/gas/config/tc-ia64.c b/gas/config/tc-ia64.c
+index b42c336..5da802f 100644
+--- a/gas/config/tc-ia64.c
++++ b/gas/config/tc-ia64.c
+@@ -775,6 +775,8 @@ static struct
+ 
+ #define ENCODED_PSP_OFFSET(OFFSET) (((OFFSET) + 16) / 4)
+ 
++extern int prev_was_data;
++
+ typedef void (*vbyte_func) PARAMS ((int, char *, char *));
+ 
+ /* Forward declarations:  */
+@@ -10840,6 +10842,8 @@ md_assemble (str)
+   if (!idesc)
+     goto done;
+ 
++  if (prev_was_data!=0) symbol_new ("$a", now_seg, (valueT) frag_now_fix (), frag_now);
++  prev_was_data=0;
+   /* Handle the dynamic ops we can handle now:  */
+   if (idesc->type == IA64_TYPE_DYN)
+     {
+diff --git a/gas/config/tc-mips.c b/gas/config/tc-mips.c
+index 8c071fb..08fa25f 100644
+--- a/gas/config/tc-mips.c
++++ b/gas/config/tc-mips.c
+@@ -108,6 +108,7 @@ static char *mips_regmask_frag;
+ #endif
+ 
+ extern int target_big_endian;
++extern int prev_was_data;
+ 
+ /* The name of the readonly data section.  */
+ #define RDATA_SECTION_NAME (OUTPUT_FLAVOR == bfd_target_ecoff_flavour \
+@@ -1958,6 +1959,9 @@ md_assemble (char *str)
+   bfd_reloc_code_real_type unused_reloc[3]
+     = {BFD_RELOC_UNUSED, BFD_RELOC_UNUSED, BFD_RELOC_UNUSED};
+ 
++  if (prev_was_data!=0) symbol_new ("$a", now_seg, (valueT) frag_now_fix (), frag_now);
++  prev_was_data=0;
++  
+   imm_expr.X_op = O_absent;
+   imm2_expr.X_op = O_absent;
+   offset_expr.X_op = O_absent;
+@@ -13717,7 +13721,7 @@ mips_fix_adjustable (fixS *fixp)
+     return 0;
+ #endif
+ 
+-  return 1;
++  return 0;
+ }
+ 
+ /* Translate internal representation of relocation info to BFD target
+diff --git a/gas/config/tc-ppc.c b/gas/config/tc-ppc.c
+index f8405fc..ee2ff91 100644
+--- a/gas/config/tc-ppc.c
++++ b/gas/config/tc-ppc.c
+@@ -2153,6 +2153,8 @@ struct ppc_fixup
+ 
+ /* This routine is called for each instruction to be assembled.  */
+ 
++extern int prev_was_data;
++
+ void
+ md_assemble (char *str)
+ {
+@@ -2172,6 +2174,8 @@ md_assemble (char *str)
+   bfd_reloc_code_real_type reloc;
+ #endif
+ 
++  if (prev_was_data!=0) symbol_new ("$a", now_seg, (valueT) frag_now_fix (), frag_now);
++  prev_was_data=0;
+   /* Get the opcode.  */
+   for (s = str; *s != '\0' && ! ISSPACE (*s); s++)
+     ;
+@@ -4690,7 +4694,8 @@ ppc_pe_tocd (int ignore ATTRIBUTE_UNUSED)
+ int
+ ppc_pe_fix_adjustable (fixS *fix)
+ {
+-  return fix->fx_r_type != BFD_RELOC_PPC_TOC16;
++/*  return fix->fx_r_type != BFD_RELOC_PPC_TOC16;*/
++  return 0;
+ }
+ 
+ #endif
+@@ -5482,15 +5487,16 @@ ppc_force_relocation (fixS *fix)
+ int
+ ppc_fix_adjustable (fixS *fix)
+ {
+-  return (fix->fx_r_type != BFD_RELOC_16_GOTOFF
+-	  && fix->fx_r_type != BFD_RELOC_LO16_GOTOFF
+-	  && fix->fx_r_type != BFD_RELOC_HI16_GOTOFF
+-	  && fix->fx_r_type != BFD_RELOC_HI16_S_GOTOFF
+-	  && fix->fx_r_type != BFD_RELOC_GPREL16
+-	  && fix->fx_r_type != BFD_RELOC_VTABLE_INHERIT
+-	  && fix->fx_r_type != BFD_RELOC_VTABLE_ENTRY
+-	  && !(fix->fx_r_type >= BFD_RELOC_PPC_TLS
+-	       && fix->fx_r_type <= BFD_RELOC_PPC64_DTPREL16_HIGHESTA));
++  return 0;
++/*  return (fix->fx_r_type != BFD_RELOC_16_GOTOFF*/
++/*          && fix->fx_r_type != BFD_RELOC_LO16_GOTOFF*/
++/*          && fix->fx_r_type != BFD_RELOC_HI16_GOTOFF*/
++/*          && fix->fx_r_type != BFD_RELOC_HI16_S_GOTOFF*/
++/*          && fix->fx_r_type != BFD_RELOC_GPREL16*/
++/*          && fix->fx_r_type != BFD_RELOC_VTABLE_INHERIT*/
++/*          && fix->fx_r_type != BFD_RELOC_VTABLE_ENTRY*/
++/*          && !(fix->fx_r_type >= BFD_RELOC_PPC_TLS*/
++/*               && fix->fx_r_type <= BFD_RELOC_PPC64_DTPREL16_HIGHESTA));*/
+ }
+ #endif
+ 
+diff --git a/gas/config/tc-sh.c b/gas/config/tc-sh.c
+index 677d1c0..69be274 100644
+--- a/gas/config/tc-sh.c
++++ b/gas/config/tc-sh.c
+@@ -35,6 +35,8 @@
+ #include "dwarf2dbg.h"
+ #include "dw2gencfi.h"
+ 
++extern int prev_was_data;
++
+ typedef struct
+   {
+     sh_arg_type type;
+@@ -2859,6 +2861,9 @@ md_assemble (char *str)
+   unsigned int size = 0;
+   char *initial_str = str;
+ 
++  if (prev_was_data!=0) symbol_new ("$a", now_seg, (valueT) frag_now_fix (), frag_now);
++  prev_was_data=0;
++
+ #ifdef HAVE_SH64
+   if (sh64_isa_mode == sh64_isa_shmedia)
+     {
+diff --git a/gas/expr.c b/gas/expr.c
+index b883285..b095174 100644
+--- a/gas/expr.c
++++ b/gas/expr.c
+@@ -1624,6 +1624,7 @@ operator (int *num_chars)
+ 
+ /* Parse an expression.  */
+ 
++int size_expression=0;
+ segT
+ expr (int rankarg,		/* Larger # is higher rank.  */
+       expressionS *resultP,	/* Deliver result here.  */
+@@ -1738,6 +1739,21 @@ expr (int rankarg,		/* Larger # is higher rank.  */
+ 				       symbol_get_frag (right.X_add_symbol),
+ 				       &frag_off))
+ 	{
++	   /* NEEDED FOR DIABLO: add special symbols for address substractions */
++	   if (!size_expression)
++	   {
++	      const char * left_name=S_GET_NAME(resultP->X_add_symbol); 
++	      const char * right_name=S_GET_NAME(right.X_add_symbol); 
++	      char * new_sym_name=malloc(strlen(left_name)+strlen(right_name)+strlen("$diablo:@-@")+1);
++
++	      strcpy(new_sym_name,"$diablo:");
++	      strcat(new_sym_name,left_name);
++	      strcat(new_sym_name,"@-@");
++	      strcat(new_sym_name,right_name);
++	      symbol_new (new_sym_name, now_seg, (valueT) frag_now_fix (), frag_now);
++	      symbol_mark_used_in_reloc (resultP->X_add_symbol);
++	      symbol_mark_used_in_reloc (right.X_add_symbol);
++	   }
+ 	  resultP->X_add_number -= right.X_add_number;
+ 	  resultP->X_add_number -= frag_off / OCTETS_PER_BYTE;
+ 	  resultP->X_add_number += (S_GET_VALUE (resultP->X_add_symbol)
+@@ -1835,6 +1851,21 @@ expr (int rankarg,		/* Larger # is higher rank.  */
+ 	    resultP->X_add_number += right.X_add_number;
+ 	  else if (op_left == O_subtract)
+ 	    {
++	       if (!size_expression)
++	       {
++		  const char * left_name=S_GET_NAME(resultP->X_add_symbol); 
++		  const char * right_name=S_GET_NAME(right.X_add_symbol); 
++		  char * new_sym_name=malloc(strlen(left_name)+strlen(right_name)+strlen("$diablo:@-@")+1);
++		  symbol_mark_used_in_reloc (resultP->X_add_symbol);
++		  symbol_mark_used_in_reloc (right.X_add_symbol);
++
++		  strcpy(new_sym_name,"$diablo:");
++		  strcat(new_sym_name,left_name);
++		  strcat(new_sym_name,"@-@");
++		  strcat(new_sym_name,right_name);
++		  symbol_new (new_sym_name, now_seg, (valueT) frag_now_fix (), frag_now);
++	       }
++
+ 	      resultP->X_add_number -= right.X_add_number;
+ 	      if (retval == rightseg && SEG_NORMAL (retval))
+ 		{
+diff --git a/gas/read.c b/gas/read.c
+index 0abbdb2..e2ea96d 100644
+--- a/gas/read.c
++++ b/gas/read.c
+@@ -208,6 +208,10 @@ static int dwarf_file_string;
+ #endif
+ #endif
+ 
++/* NEEDED for diablo: -1 means there was no previous data or code symbol, 0
++ * means previous was code, 1 means previous was data */
++int prev_was_data=-1;
++
+ static void do_s_func (int end_p, const char *default_prefix);
+ static void do_align (int, char *, int, int);
+ static void s_align (int, int);
+@@ -3773,12 +3777,19 @@ cons_worker (register int nbytes,	/* 1=.byte, 2=.word, 4=.long.  */
+ void
+ cons (int size)
+ {
++  /* NEEDED FOR DIABLO: add data symbols */
++  if (prev_was_data!=1) symbol_new ("$d", now_seg, (valueT) frag_now_fix (), frag_now);
++    prev_was_data=1;
++
+   cons_worker (size, 0);
+ }
+ 
+ void
+ s_rva (int size)
+ {
++  /* NEEDED FOR DIABLO: add data symbols */
++  if (prev_was_data!=1) symbol_new ("$d", now_seg, (valueT) frag_now_fix (), frag_now);
++    prev_was_data=1;
+   cons_worker (size, 1);
+ }
+ 
+@@ -4564,6 +4575,9 @@ float_cons (/* Clobbers input_line-pointer, checks end-of-line.  */
+   md_flush_pending_output ();
+ #endif
+ 
++  /* NEEDED FOR DIABLO: add data symbols */
++  if (prev_was_data!=1) symbol_new ("$d", now_seg, (valueT) frag_now_fix (), frag_now);
++    prev_was_data=1;
+   do
+     {
+       /* input_line_pointer->1st char of a flonum (we hope!).  */
+diff --git a/ld/ldlang.c b/ld/ldlang.c
+index decfc5f..f25bf16 100644
+--- a/ld/ldlang.c
++++ b/ld/ldlang.c
+@@ -2092,6 +2092,8 @@ lang_add_section (lang_statement_list_type *ptr,
+       if (! first && (output->bfd_section->flags & SEC_READONLY) == 0)
+ 	flags &= ~ SEC_READONLY;
+ 
++      /* turn off section merging, Diablo can't handle it */
++#if 0
+       /* Keep SEC_MERGE and SEC_STRINGS only if they are the same.  */
+       if (! first
+ 	  && ((output->bfd_section->flags & (SEC_MERGE | SEC_STRINGS))
+@@ -2107,6 +2109,10 @@ lang_add_section (lang_statement_list_type *ptr,
+ 
+       if (flags & SEC_MERGE)
+ 	output->bfd_section->entsize = section->entsize;
++#else
++      output->bfd_section->flags |= flags;
++      flags &= ~(SEC_MERGE | SEC_STRINGS);
++#endif
+ 
+       /* If SEC_READONLY is not set in the input section, then clear
+ 	 it from the output section.  */

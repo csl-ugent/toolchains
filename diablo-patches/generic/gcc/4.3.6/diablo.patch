@@ -1,0 +1,91 @@
+--- gcc-4.3.1/gcc/final.c	2008-01-27 00:08:54.000000000 +0100
++++ gcc-4.3.1-patched/gcc/final.c	2008-08-06 15:24:29.000000000 +0200
+@@ -265,12 +265,15 @@
+ /* Enable APP processing of subsequent output.
+    Used before the output from an `asm' statement.  */
+ 
++static int asmcount=1;
+ void
+ app_enable (void)
+ {
++  
+   if (! app_on)
+     {
+       fputs (ASM_APP_ON, asm_out_file);
++      fprintf(asm_out_file,"$handwritten%d:\n",asmcount++);
+       app_on = 1;
+     }
+ }
+@@ -284,6 +287,7 @@
+   if (app_on)
+     {
+       fputs (ASM_APP_OFF, asm_out_file);
++      fprintf(asm_out_file,"$compiler%d:\n",asmcount++);
+       app_on = 0;
+     }
+ }
+@@ -1996,11 +2000,7 @@
+       if (LABEL_NAME (insn))
+ 	(*debug_hooks->label) (insn);
+ 
+-      if (app_on)
+-	{
+-	  fputs (ASM_APP_OFF, file);
+-	  app_on = 0;
+-	}
++      app_disable();
+ 
+       next = next_nonnote_insn (insn);
+       if (next != 0 && JUMP_P (next))
+@@ -2100,11 +2100,7 @@
+ 	    else
+ 	      switch_to_section (current_function_section ());
+ 
+-	    if (app_on)
+-	      {
+-		fputs (ASM_APP_OFF, file);
+-		app_on = 0;
+-	      }
++            app_disable();
+ 
+ #if defined(ASM_OUTPUT_ADDR_VEC) || defined(ASM_OUTPUT_ADDR_DIFF_VEC)
+ 	    if (GET_CODE (body) == ADDR_VEC)
+@@ -2178,11 +2174,7 @@
+ 	      {
+ 		expanded_location loc;
+ 
+-		if (! app_on)
+-		  {
+-		    fputs (ASM_APP_ON, file);
+-		    app_on = 1;
+-		  }
++		app_enable();
+ #ifdef USE_MAPPED_LOCATION
+ 		loc = expand_location (ASM_INPUT_SOURCE_LOCATION (body));
+ #else
+@@ -2227,11 +2219,7 @@
+ 	    /* Output the insn using them.  */
+ 	    if (string[0])
+ 	      {
+-		if (! app_on)
+-		  {
+-		    fputs (ASM_APP_ON, file);
+-		    app_on = 1;
+-		  }
++		app_enable();
+ 		if (expanded.file && expanded.line)
+ 		  fprintf (asm_out_file, "%s %i \"%s\" 1\n",
+ 			   ASM_COMMENT_START, expanded.line, expanded.file);
+@@ -2246,11 +2234,7 @@
+ 	    break;
+ 	  }
+ 
+-	if (app_on)
+-	  {
+-	    fputs (ASM_APP_OFF, file);
+-	    app_on = 0;
+-	  }
++	app_disable();
+ 
+ 	if (GET_CODE (body) == SEQUENCE)
+ 	  {

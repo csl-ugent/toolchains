@@ -1,0 +1,12 @@
+diff -ru a/libgcc/Makefile.in b/libgcc/Makefile.in
+--- a/libgcc/Makefile.in	2014-01-08 17:37:08.000000000 +0100
++++ b/libgcc/Makefile.in	2016-02-09 09:05:00.645168070 +0100
+@@ -280,7 +280,7 @@
+ 		  $(INCLUDES) @set_have_cc_tls@ @set_use_emutls@
+ 
+ # Options to use when compiling crtbegin/end.
+-CRTSTUFF_CFLAGS = -O2 $(GCC_CFLAGS) $(INCLUDES) $(MULTILIB_CFLAGS) -g0 \
++CRTSTUFF_CFLAGS = -O2 $(GCC_CFLAGS) $(INCLUDES) $(MULTILIB_CFLAGS) \
+   -finhibit-size-directive -fno-inline -fno-exceptions \
+   -fno-zero-initialized-in-bss -fno-toplevel-reorder -fno-tree-vectorize \
+   -fno-stack-protector \

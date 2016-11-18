@@ -1,0 +1,205 @@
+diff -r -u a/gas/config/tc-i386.c b/gas/config/tc-i386.c
+--- a/gas/config/tc-i386.c	2013-12-24 11:03:13.411175354 +0100
++++ b/gas/config/tc-i386.c	2013-12-17 10:36:40.857173030 +0100
+@@ -505,6 +505,9 @@
+ /* The dwarf2 data alignment, adjusted for 32 or 64 bit.  */
+ int x86_cie_data_alignment;
+ 
++/* Used by to mark data section for DIABLO */
++extern int prev_was_data;
++
+ /* Interface to relax_segment.
+    There are 3 major relax states for 386 jump insns because the
+    different types of jumps add different sizes to frags when we're
+@@ -3001,6 +3004,11 @@
+   char mnemonic[MAX_MNEM_SIZE];
+   const insn_template *t;
+ 
++  /* Add symbol indicating code section for DIABLO */
++  if (prev_was_data!=0) symbol_new ("$a", now_seg, (valueT) frag_now_fix (), frag_now);
++  prev_was_data=0;
++
++
+   /* Initialize globals.  */
+   memset (&i, '\0', sizeof (i));
+   for (j = 0; j < MAX_OPERANDS; j++)
+diff -r -u a/gas/config/tc-ia64.c b/gas/config/tc-ia64.c
+--- a/gas/config/tc-ia64.c	2013-12-24 11:03:13.411175354 +0100
++++ b/gas/config/tc-ia64.c	2013-12-17 10:36:40.857173030 +0100
+@@ -215,6 +215,9 @@
+ 
+ const char *md_shortopts = "m:N:x::";
+ 
++/* Used by to mark data section for DIABLO */
++extern int prev_was_data;
++
+ struct option md_longopts[] =
+   {
+ #define OPTION_MCONSTANT_GP (OPTION_MD_BASE + 1)
+@@ -10527,6 +10530,10 @@
+   if (!idesc)
+     goto done;
+ 
++  /* Add symbol indicating code section for DIABLO */
++  if (prev_was_data!=0) symbol_new ("$a", now_seg, (valueT) frag_now_fix (), frag_now);
++  prev_was_data=0;
++
+   /* Handle the dynamic ops we can handle now:  */
+   if (idesc->type == IA64_TYPE_DYN)
+     {
+diff -r -u a/gas/config/tc-mips.c b/gas/config/tc-mips.c
+--- a/gas/config/tc-mips.c	2013-12-24 11:03:13.415175365 +0100
++++ b/gas/config/tc-mips.c	2013-12-17 10:36:40.853173017 +0100
+@@ -790,6 +790,9 @@
+ 
+ static struct mips_hi_fixup *mips_hi_fixup_list;
+ 
++/* Used by to mark data section for DIABLO */
++extern int prev_was_data;
++
+ /* The frag containing the last explicit relocation operator.
+    Null if explicit relocations have not been used.  */
+ 
+@@ -2555,6 +2558,10 @@
+   bfd_reloc_code_real_type unused_reloc[3]
+     = {BFD_RELOC_UNUSED, BFD_RELOC_UNUSED, BFD_RELOC_UNUSED};
+ 
++  /* Add symbol indicating code section for DIABLO */
++  if (prev_was_data!=0) symbol_new ("$a", now_seg, (valueT) frag_now_fix (), frag_now);
++  prev_was_data=0;
++
+   imm_expr.X_op = O_absent;
+   imm2_expr.X_op = O_absent;
+   offset_expr.X_op = O_absent;
+diff -r -u a/gas/config/tc-ppc.c b/gas/config/tc-ppc.c
+--- a/gas/config/tc-ppc.c	2013-12-24 11:03:13.415175365 +0100
++++ b/gas/config/tc-ppc.c	2013-12-17 10:36:40.853173017 +0100
+@@ -195,6 +195,9 @@
+    of the PPC_OPCODE flags defined in opcode/ppc.h.  */
+ ppc_cpu_t ppc_cpu = 0;
+ 
++/* Used by to mark data section for DIABLO */
++extern int prev_was_data;
++
+ /* Flags set on encountering toc relocs.  */
+ enum {
+   has_large_toc_reloc = 1,
+@@ -2388,6 +2391,10 @@
+   bfd_reloc_code_real_type reloc;
+ #endif
+ 
++  /* Add symbol indicating code section for DIABLO */
++  if (prev_was_data!=0) symbol_new ("$a", now_seg, (valueT) frag_now_fix (), frag_now);
++  prev_was_data=0;
++
+   /* Get the opcode.  */
+   for (s = str; *s != '\0' && ! ISSPACE (*s); s++)
+     ;
+diff -r -u a/gas/config/tc-sh.c b/gas/config/tc-sh.c
+--- a/gas/config/tc-sh.c	2013-12-24 11:03:13.419175378 +0100
++++ b/gas/config/tc-sh.c	2013-12-17 10:36:40.857173030 +0100
+@@ -157,6 +157,9 @@
+ /* or    0d1.2345e12 */
+ const char FLT_CHARS[] = "rRsSfFdDxXpP";
+ 
++/* Used by to mark data section for DIABLO */
++extern int prev_was_data;
++
+ #define C(a,b) ENCODE_RELAX(a,b)
+ 
+ #define ENCODE_RELAX(what,length) (((what) << 4) + (length))
+@@ -2905,6 +2908,10 @@
+   unsigned int size = 0;
+   char *initial_str = str;
+ 
++  /* Add symbol indicating code section for DIABLO */
++  if (prev_was_data!=0) symbol_new ("$a", now_seg, (valueT) frag_now_fix (), frag_now);
++  prev_was_data=0;
++
+ #ifdef HAVE_SH64
+   if (sh64_isa_mode == sh64_isa_shmedia)
+     {
+diff -r -u a/gas/read.c b/gas/read.c
+--- a/gas/read.c	2013-12-24 11:03:13.419175378 +0100
++++ b/gas/read.c	2013-12-17 10:36:40.861173044 +0100
+@@ -209,6 +209,10 @@
+ #endif
+ #endif
+ 
++/* NEEDED for diablo: -1 means there was no previous data or code symbol, 0
++ * means previous was code, 1 means previous was data */
++int prev_was_data=-1;
++
+ static void do_s_func (int end_p, const char *default_prefix);
+ static void do_align (int, char *, int, int);
+ static void s_align (int, int);
+@@ -3891,12 +3895,22 @@
+ void
+ cons (int size)
+ {
++  /* NEEDED FOR DIABLO: add data symbols */
++  if (prev_was_data!=1) {
++      symbol_new ("$d", now_seg, (valueT) frag_now_fix (), frag_now);
++  }
++  prev_was_data=1;
+   cons_worker (size, 0);
+ }
+ 
+ void
+ s_rva (int size)
+ {
++  /* NEEDED FOR DIABLO: add data symbols */
++  if (prev_was_data!=1) {
++      symbol_new ("$d", now_seg, (valueT) frag_now_fix (), frag_now);
++  }
++  prev_was_data=1;
+   cons_worker (size, 1);
+ }
+ 
+@@ -4723,6 +4737,12 @@
+   md_cons_align (1);
+ #endif
+ 
++  /* NEEDED FOR DIABLO: add data symbols */
++  if (prev_was_data!=1) {
++      symbol_new ("$d", now_seg, (valueT) frag_now_fix (), frag_now);
++  }
++  prev_was_data=1;
++
+   do
+     {
+       /* input_line_pointer->1st char of a flonum (we hope!).  */
+diff -r -u a/gas/subsegs.c b/gas/subsegs.c
+--- a/gas/subsegs.c	2009-09-11 17:27:33.000000000 +0200
++++ b/gas/subsegs.c	2013-12-24 11:02:52.351110508 +0100
+@@ -27,6 +27,9 @@
+ #include "subsegs.h"
+ #include "obstack.h"
+ 
++/* Diablo marks data and code with $d, $a. */
++extern int prev_was_data;
++
+ frchainS *frchain_now;
+ 
+ static struct obstack frchains;
+@@ -181,6 +184,10 @@
+ 
+   secptr = subseg_get (segname, 0);
+   subseg_set_rest (secptr, subseg);
++
++  /* Regenerate a $d or $a for Diablo */
++  prev_was_data = -1;
++
+   return secptr;
+ }
+ 
+@@ -193,6 +200,10 @@
+ 
+   secptr = subseg_get (segname, 1);
+   subseg_set_rest (secptr, subseg);
++
++  /* Regenerate a $d or $a for Diablo */
++  prev_was_data = -1;
++
+   return secptr;
+ }

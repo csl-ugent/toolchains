@@ -1,0 +1,25 @@
+diff -r -u a/sysdeps/i386/sysdep.h b/sysdeps/i386/sysdep.h
+--- a/sysdeps/i386/sysdep.h	2012-08-17 21:39:53.000000000 +0200
++++ b/sysdeps/i386/sysdep.h	2014-01-06 17:12:41.679459979 +0100
+@@ -112,8 +112,10 @@
+   .p2align 4;								      \
+   .type GET_PC_THUNK(reg),@function;					      \
+ GET_PC_THUNK(reg):							      \
++  cfi_startproc;							      \
+   movl (%esp), %e##reg;							      \
+   ret;									      \
++  cfi_endproc;							      \
+   .size GET_PC_THUNK(reg), . - GET_PC_THUNK(reg);			      \
+   .previous;								      \
+   .endif;								      \
+@@ -155,8 +157,10 @@
+   ".p2align 4\n"							\
+   ".type " GET_PC_THUNK_STR (reg) ",@function\n"			\
+ GET_PC_THUNK_STR (reg) ":"						\
++  ".cfi_startproc\n"								\
+   "movl (%%esp), %%e" #reg "\n"						\
+   "ret\n"								\
++  ".cfi_endproc\n"								\
+   ".size " GET_PC_THUNK_STR (reg) ", . - " GET_PC_THUNK_STR (reg) "\n"	\
+   ".previous\n"								\
+   ".endif\n"								\

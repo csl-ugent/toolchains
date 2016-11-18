@@ -1,0 +1,87 @@
+diff --git a/include/llvm/MC/MCStreamer.h b/include/llvm/MC/MCStreamer.h
+index 63a43d0..bccaa46 100644
+--- a/include/llvm/MC/MCStreamer.h
++++ b/include/llvm/MC/MCStreamer.h
+@@ -393,6 +393,8 @@ public:
+   // add the section we're emitting it to later.
+   virtual void EmitLabel(MCSymbol *Symbol);
+ 
++  virtual void EmitDiabloHandwritten(bool on) {};
++
+   virtual void EmitEHSymAttributes(const MCSymbol *Symbol, MCSymbol *EHSymbol);
+ 
+   /// EmitAssemblerFlag - Note in the output the specified @p Flag.
+diff --git a/lib/CodeGen/AsmPrinter/AsmPrinterInlineAsm.cpp b/lib/CodeGen/AsmPrinter/AsmPrinterInlineAsm.cpp
+index e04c91c..1480506 100644
+--- a/lib/CodeGen/AsmPrinter/AsmPrinterInlineAsm.cpp
++++ b/lib/CodeGen/AsmPrinter/AsmPrinterInlineAsm.cpp
+@@ -447,13 +447,16 @@ void AsmPrinter::EmitInlineAsm(const MachineInstr *MI) const {
+   // If this asmstr is empty, just print the #APP/#NOAPP markers.
+   // These are useful to see where empty asm's wound up.
+   if (AsmStr[0] == 0) {
++    OutStreamer.EmitDiabloHandwritten(true);
+     OutStreamer.emitRawComment(MAI->getInlineAsmStart());
++    OutStreamer.EmitDiabloHandwritten(false);
+     OutStreamer.emitRawComment(MAI->getInlineAsmEnd());
+     return;
+   }
+ 
+   // Emit the #APP start marker.  This has to happen even if verbose-asm isn't
+   // enabled, so we use emitRawComment.
++  OutStreamer.EmitDiabloHandwritten(true);
+   OutStreamer.emitRawComment(MAI->getInlineAsmStart());
+ 
+   // Get the !srcloc metadata node if we have it, and decode the loc cookie from
+@@ -490,6 +493,7 @@ void AsmPrinter::EmitInlineAsm(const MachineInstr *MI) const {
+ 
+   // Emit the #NOAPP end marker.  This has to happen even if verbose-asm isn't
+   // enabled, so we use emitRawComment.
++  OutStreamer.EmitDiabloHandwritten(false);
+   OutStreamer.emitRawComment(MAI->getInlineAsmEnd());
+ }
+ 
+diff --git a/lib/MC/MCAsmStreamer.cpp b/lib/MC/MCAsmStreamer.cpp
+index 14f0f05..ffc87ba 100644
+--- a/lib/MC/MCAsmStreamer.cpp
++++ b/lib/MC/MCAsmStreamer.cpp
+@@ -53,6 +53,9 @@ private:
+   unsigned ShowInst : 1;
+   unsigned UseDwarfDirectory : 1;
+ 
++  // Use this to generate unique '$handwritten: x'
++  int HandwritenAsmCount;
++
+   void EmitRegisterName(int64_t Register);
+   void EmitCFIStartProcImpl(MCDwarfFrameInfo &Frame) override;
+   void EmitCFIEndProcImpl(MCDwarfFrameInfo &Frame) override;
+@@ -65,7 +68,7 @@ public:
+       : MCStreamer(Context), OS(os), MAI(Context.getAsmInfo()),
+         InstPrinter(printer), Emitter(emitter), AsmBackend(asmbackend),
+         CommentStream(CommentToEmit), IsVerboseAsm(isVerboseAsm),
+-        ShowInst(showInst), UseDwarfDirectory(useDwarfDirectory) {
++        ShowInst(showInst), UseDwarfDirectory(useDwarfDirectory), HandwritenAsmCount(0) {
+     if (InstPrinter && IsVerboseAsm)
+       InstPrinter->setCommentStream(CommentStream);
+   }
+@@ -120,7 +123,7 @@ public:
+ 
+   void EmitLOHDirective(MCLOHType Kind, const MCLOHArgs &Args) override;
+   void EmitLabel(MCSymbol *Symbol) override;
+-
++  void EmitDiabloHandwritten(bool on);
+   void EmitAssemblerFlag(MCAssemblerFlag Flag) override;
+   void EmitLinkerOptions(ArrayRef<std::string> Options) override;
+   void EmitDataRegion(MCDataRegionType Kind) override;
+@@ -333,6 +336,12 @@ void MCAsmStreamer::EmitLOHDirective(MCLOHType Kind, const MCLOHArgs &Args) {
+   EmitEOL();
+ }
+ 
++void MCAsmStreamer::EmitDiabloHandwritten(bool on) {
++  OS << (on ? "$handwritten" : "$compiler") << HandwritenAsmCount << ":";
++  if (!on) HandwritenAsmCount++;
++  EmitEOL();
++}
++
+ void MCAsmStreamer::EmitAssemblerFlag(MCAssemblerFlag Flag) {
+   switch (Flag) {
+   case MCAF_SyntaxUnified:         OS << "\t.syntax unified"; break;

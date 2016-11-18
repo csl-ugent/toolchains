@@ -1,0 +1,25 @@
+diff --git a/tools/clang/include/clang/Basic/Version.inc.in b/tools/clang/include/clang/Basic/Version.inc.in
+index ccf8430..4f70ed1 100644
+--- a/tools/clang/include/clang/Basic/Version.inc.in
++++ b/tools/clang/include/clang/Basic/Version.inc.in
+@@ -1,6 +1,7 @@
+ #define CLANG_VERSION @CLANG_VERSION@
+ #define CLANG_VERSION_MAJOR @CLANG_VERSION_MAJOR@
+ #define CLANG_VERSION_MINOR @CLANG_VERSION_MINOR@
++#define DIABLO_TC_REV @DIABLO_TC_REV@
+ #if @CLANG_HAS_VERSION_PATCHLEVEL@
+ #define CLANG_VERSION_PATCHLEVEL @CLANG_VERSION_PATCHLEVEL@
+ #endif
+diff --git a/tools/clang/lib/Basic/Version.cpp b/tools/clang/lib/Basic/Version.cpp
+index c2b7753..7a7d328 100644
+--- a/tools/clang/lib/Basic/Version.cpp
++++ b/tools/clang/lib/Basic/Version.cpp
+@@ -127,6 +127,7 @@ std::string getClangToolFullVersion(StringRef ToolName) {
+ #endif
+   OS << ToolName << " version " CLANG_VERSION_STRING " "
+-     << getClangFullRepositoryVersion();
++     << getClangFullRepositoryVersion()
++     << DIABLO_TC_REV;
+ 
+   // If vendor supplied, include the base LLVM version as well.
+ #ifdef CLANG_VENDOR

@@ -1,0 +1,12 @@
+diff -ur a/bfd/elf32-arm.c b/bfd/elf32-arm.c
+--- a/bfd/elf32-arm.c	2013-03-25 09:06:19.000000000 +0100
++++ b/bfd/elf32-arm.c	2014-06-19 17:14:59.407661495 +0200
+@@ -10835,7 +10835,7 @@
+ 	  /* An EXIDX_CANTUNWIND entry.  */
+ 	  if (second_word == 1)
+ 	    {
+-	      if (last_unwind_type == 0)
++	      if(merge_exidx_entries && last_unwind_type == 0)
+ 		elide = 1;
+ 	      unwind_type = 0;
+ 	    }

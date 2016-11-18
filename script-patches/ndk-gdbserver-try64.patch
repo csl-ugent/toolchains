@@ -1,0 +1,12 @@
+diff --git a/build/tools/build-gdbserver.sh b/build/tools/build-gdbserver.sh
+index 2e8289d..fb6eb74 100755
+--- a/build/tools/build-gdbserver.sh
++++ b/build/tools/build-gdbserver.sh
+@@ -58,6 +58,7 @@ PACKAGE_DIR=
+ register_var_option "--package-dir=<path>" PACKAGE_DIR "Archive binary into specific directory"
+ 
+ register_jobs_option
++register_try64_option
+ 
+ extract_parameters "$@"
+ 

@@ -1,0 +1,4 @@
+crosstool-ng/
+.android_src/
+.llvm_src/
+.android_temp/

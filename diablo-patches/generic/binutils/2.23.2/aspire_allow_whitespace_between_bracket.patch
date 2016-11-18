@@ -1,0 +1,22 @@
+--- a/gas/config/tc-arm.c	2013/06/24 23:35:21	1.523.2.8
++++ b/gas/config/tc-arm.c	2013/06/24 23:36:16	1.523.2.9
+@@ -886,6 +886,9 @@
+ static inline int
+ skip_past_char (char ** str, char c)
+ {
++  /* PR gas/14987: Allow for whitespace before the expected character.  */
++  skip_whitespace (*str);
++  
+   if (**str == c)
+     {
+       (*str)++;
+@@ -5173,6 +5176,9 @@
+       return PARSE_OPERAND_SUCCESS;
+     }
+ 
++  /* PR gas/14887: Allow for whitespace after the opening bracket.  */
++  skip_whitespace (p);
++
+   if ((reg = arm_reg_parse (&p, REG_TYPE_RN)) == FAIL)
+     {
+       inst.error = _(reg_expected_msgs[REG_TYPE_RN]);

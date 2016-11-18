@@ -1,0 +1,377 @@
+diff --git a/include/llvm/CodeGen/AsmPrinter.h b/include/llvm/CodeGen/AsmPrinter.h
+index a92b859..55770e4 100644
+--- a/include/llvm/CodeGen/AsmPrinter.h
++++ b/include/llvm/CodeGen/AsmPrinter.h
+@@ -483,6 +483,8 @@ namespace llvm {
+                             const MachineBasicBlock *MBB,
+                             unsigned uid) const;
+     void EmitLLVMUsedList(const Constant *List);
++    /// Emit llvm.ident metadata in an '.ident' directive.
++    void EmitModuleIdents(Module &M);
+     void EmitXXStructorList(const Constant *List, bool isCtor);
+     GCMetadataPrinter *GetOrCreateGCPrinter(GCStrategy *C);
+   };
+diff --git a/include/llvm/MC/MCAsmInfo.h b/include/llvm/MC/MCAsmInfo.h
+index 97aad71..7e9b0ee 100644
+--- a/include/llvm/MC/MCAsmInfo.h
++++ b/include/llvm/MC/MCAsmInfo.h
+@@ -263,6 +263,10 @@ namespace llvm {
+     /// .file directive, this is true for ELF targets.
+     bool HasSingleParameterDotFile;          // Defaults to true.
+ 
++    /// HasIdentDirective - True if the target has a .ident directive, this is
++    /// true for ELF targets.
++    bool HasIdentDirective; // Defaults to true.
++
+     /// HasNoDeadStrip - True if this target supports the MachO .no_dead_strip
+     /// directive.
+     bool HasNoDeadStrip;                     // Defaults to false.
+@@ -504,6 +508,7 @@ namespace llvm {
+     }
+     bool hasDotTypeDotSizeDirective() const {return HasDotTypeDotSizeDirective;}
+     bool hasSingleParameterDotFile() const { return HasSingleParameterDotFile; }
++    bool hasIdentDirective() const { return HasIdentDirective; }
+     bool hasNoDeadStrip() const { return HasNoDeadStrip; }
+     bool hasSymbolResolver() const { return HasSymbolResolver; }
+     const char *getWeakRefDirective() const { return WeakRefDirective; }
+diff --git a/include/llvm/MC/MCStreamer.h b/include/llvm/MC/MCStreamer.h
+index 230d27e..8521169 100644
+--- a/include/llvm/MC/MCStreamer.h
++++ b/include/llvm/MC/MCStreamer.h
+@@ -471,6 +471,10 @@ namespace llvm {
+     /// implement the '.file "foo.c"' assembler directive.
+     virtual void EmitFileDirective(StringRef Filename) = 0;
+ 
++    /// EmitIdent - Emit the "identifiers" directive. This implements the
++    /// '.ident "version foo"' assembler directive.
++    virtual void EmitIdent(StringRef IdentString) = 0;
++
+     /// EmitDwarfFileDirective - Associate a filename with a specified logical
+     /// file number.  This implements the DWARF2 '.file 4 "foo.c"' assembler
+     /// directive.
+diff --git a/lib/CodeGen/AsmPrinter/AsmPrinter.cpp b/lib/CodeGen/AsmPrinter/AsmPrinter.cpp
+index d74a703..c2b9cab 100644
+--- a/lib/CodeGen/AsmPrinter/AsmPrinter.cpp
++++ b/lib/CodeGen/AsmPrinter/AsmPrinter.cpp
+@@ -928,6 +928,10 @@ bool AsmPrinter::doFinalization(Module &M) {
+     if (GCMetadataPrinter *MP = GetOrCreateGCPrinter(*--I))
+       MP->finishAssembly(*this);
+ 
++  // Emit llvm.ident metadata in an '.ident' directive.
++  EmitModuleIdents(M);
++
++
+   // If we don't have any trampolines, then we don't require stack memory
+   // to be executable. Some targets have a directive to declare this.
+   Function *InitTrampolineIntrinsic = M.getFunction("llvm.init.trampoline");
+@@ -1313,6 +1317,21 @@ void AsmPrinter::EmitXXStructorList(const Constant *List, bool isCtor) {
+   }
+ }
+ 
++void AsmPrinter::EmitModuleIdents(Module &M) {
++  if (!MAI->hasIdentDirective())
++    return;
++
++  if (const NamedMDNode *NMD = M.getNamedMetadata("llvm.ident")) {
++    for (unsigned i = 0, e = NMD->getNumOperands(); i != e; ++i) {
++      const MDNode *N = NMD->getOperand(i);
++      assert(N->getNumOperands() == 1 &&
++             "llvm.ident metadata entry can have only one operand");
++      const MDString *S = cast<MDString>(N->getOperand(0));
++      OutStreamer.EmitIdent(S->getString());
++    }
++  }
++}
++
+ //===--------------------------------------------------------------------===//
+ // Emission and print routines
+ //
+diff --git a/lib/MC/MCAsmInfo.cpp b/lib/MC/MCAsmInfo.cpp
+index 7ea0f3b..2e6275c 100644
+--- a/lib/MC/MCAsmInfo.cpp
++++ b/lib/MC/MCAsmInfo.cpp
+@@ -72,6 +72,7 @@ MCAsmInfo::MCAsmInfo() {
+   LCOMMDirectiveAlignmentType = LCOMM::NoAlignment;
+   HasDotTypeDotSizeDirective = true;
+   HasSingleParameterDotFile = true;
++  HasIdentDirective = true;
+   HasNoDeadStrip = false;
+   HasSymbolResolver = false;
+   WeakRefDirective = 0;
+diff --git a/lib/MC/MCAsmInfoCOFF.cpp b/lib/MC/MCAsmInfoCOFF.cpp
+index fd79193..842a52f 100644
+--- a/lib/MC/MCAsmInfoCOFF.cpp
++++ b/lib/MC/MCAsmInfoCOFF.cpp
+@@ -25,6 +25,7 @@ MCAsmInfoCOFF::MCAsmInfoCOFF() {
+   LCOMMDirectiveAlignmentType = LCOMM::ByteAlignment;
+   HasDotTypeDotSizeDirective = false;
+   HasSingleParameterDotFile = false;
++  HasIdentDirective = true;
+   PrivateGlobalPrefix = "L";  // Prefix for private global symbols
+   WeakRefDirective = "\t.weak\t";
+   LinkOnceDirective = "\t.linkonce discard\n";
+diff --git a/lib/MC/MCAsmStreamer.cpp b/lib/MC/MCAsmStreamer.cpp
+index 17a6323..b2e58e6 100644
+--- a/lib/MC/MCAsmStreamer.cpp
++++ b/lib/MC/MCAsmStreamer.cpp
+@@ -213,6 +213,7 @@ public:
+                                      unsigned Isa, unsigned Discriminator,
+                                      StringRef FileName);
+ 
++  virtual void EmitIdent(StringRef IdentString);
+   virtual void EmitCFISections(bool EH, bool Debug);
+   virtual void EmitCFIDefCfa(int64_t Register, int64_t Offset);
+   virtual void EmitCFIDefCfaOffset(int64_t Offset);
+@@ -855,6 +856,13 @@ void MCAsmStreamer::EmitDwarfLocDirective(unsigned FileNo, unsigned Line,
+   EmitEOL();
+ }
+ 
++void MCAsmStreamer::EmitIdent(StringRef IdentString) {
++  assert(MAI->hasIdentDirective() && ".ident directive not supported");
++  OS << "\t.ident\t";
++  PrintQuotedString(IdentString, OS);
++  EmitEOL();
++}
++
+ void MCAsmStreamer::EmitCFISections(bool EH, bool Debug) {
+   MCStreamer::EmitCFISections(EH, Debug);
+ 
+diff --git a/lib/MC/MCELFStreamer.cpp b/lib/MC/MCELFStreamer.cpp
+index 14fbc1e..089635b 100644
+--- a/lib/MC/MCELFStreamer.cpp
++++ b/lib/MC/MCELFStreamer.cpp
+@@ -40,12 +40,14 @@ class MCELFStreamer : public MCObjectStreamer {
+ public:
+   MCELFStreamer(MCContext &Context, MCAsmBackend &TAB,
+                   raw_ostream &OS, MCCodeEmitter *Emitter)
+-    : MCObjectStreamer(Context, TAB, OS, Emitter) {}
++    : MCObjectStreamer(Context, TAB, OS, Emitter),
++                         SeenIdent(false) {}
+ 
+   MCELFStreamer(MCContext &Context, MCAsmBackend &TAB,
+                 raw_ostream &OS, MCCodeEmitter *Emitter,
+                 MCAssembler *Assembler)
+-    : MCObjectStreamer(Context, TAB, OS, Emitter, Assembler) {}
++    : MCObjectStreamer(Context, TAB, OS, Emitter, Assembler),
++                         SeenIdent(false) {}
+ 
+ 
+   ~MCELFStreamer() {}
+@@ -103,6 +105,8 @@ public:
+ 
+   virtual void EmitFileDirective(StringRef Filename);
+ 
++  virtual void EmitIdent(StringRef IdentString);
++
+   virtual void EmitTCEntry(const MCSymbol &S);
+ 
+   virtual void FinishImpl();
+@@ -113,6 +117,8 @@ private:
+ 
+   void fixSymbolsInTLSFixups(const MCExpr *expr);
+ 
++  bool SeenIdent;
++
+   struct LocalCommon {
+     MCSymbolData *SD;
+     uint64_t Size;
+@@ -370,6 +376,24 @@ void MCELFStreamer::EmitFileDirective(StringRef Filename) {
+   SD.setFlags(ELF_STT_File | ELF_STB_Local | ELF_STV_Default);
+ }
+ 
++void MCELFStreamer::EmitIdent(StringRef IdentString) {
++  const MCSection *Comment =
++  getAssembler().getContext().getELFSection(".comment", ELF::SHT_PROGBITS,
++                                            ELF::SHF_MERGE |
++                                            ELF::SHF_STRINGS,
++                                            SectionKind::getReadOnly(),
++                                            1, "");
++  PushSection();
++  SwitchSection(Comment);
++  if (!SeenIdent) {
++    EmitIntValue(0, 1);
++    SeenIdent = true;
++  }
++  EmitBytes(IdentString, 0);
++  EmitIntValue(0, 1);
++  PopSection();
++}
++
+ void  MCELFStreamer::fixSymbolsInTLSFixups(const MCExpr *expr) {
+   switch (expr->getKind()) {
+   case MCExpr::Target: llvm_unreachable("Can't handle target exprs yet!");
+diff --git a/lib/MC/MCMachOStreamer.cpp b/lib/MC/MCMachOStreamer.cpp
+index 04b0e86..6271f02 100644
+--- a/lib/MC/MCMachOStreamer.cpp
++++ b/lib/MC/MCMachOStreamer.cpp
+@@ -82,6 +82,10 @@ public:
+ 
+     //report_fatal_error("unsupported directive: '.file'");
+   }
++
++  virtual void EmitIdent(StringRef IdentString) {
++    llvm_unreachable("macho doesn't support this directive");
++  }
+ 
+   virtual void FinishImpl();
+ 
+diff --git a/lib/MC/MCNullStreamer.cpp b/lib/MC/MCNullStreamer.cpp
+index 4c17d91..5dd2dc0 100644
+--- a/lib/MC/MCNullStreamer.cpp
++++ b/lib/MC/MCNullStreamer.cpp
+@@ -92,6 +92,7 @@ namespace {
+                                        unsigned Column, unsigned Flags,
+                                        unsigned Isa, unsigned Discriminator,
+                                        StringRef FileName) {}
++    virtual void EmitIdent(StringRef IdentString) {}
+     virtual void EmitInstruction(const MCInst &Inst) {}
+ 
+     virtual void FinishImpl() {}
+diff --git a/lib/MC/MCParser/ELFAsmParser.cpp b/lib/MC/MCParser/ELFAsmParser.cpp
+index d55de1f..99eec70 100644
+--- a/lib/MC/MCParser/ELFAsmParser.cpp
++++ b/lib/MC/MCParser/ELFAsmParser.cpp
+@@ -30,10 +30,9 @@ class ELFAsmParser : public MCAsmParserExtension {
+ 
+   bool ParseSectionSwitch(StringRef Section, unsigned Type,
+                           unsigned Flags, SectionKind Kind);
+-  bool SeenIdent;
+ 
+ public:
+-  ELFAsmParser() : SeenIdent(false) {
++  ELFAsmParser() {
+     BracketExpressionsSupported = true;
+   }
+ 
+@@ -504,22 +503,7 @@ bool ELFAsmParser::ParseDirectiveIdent(StringRef, SMLoc) {
+ 
+   Lex();
+ 
+-  const MCSection *Comment =
+-    getContext().getELFSection(".comment", ELF::SHT_PROGBITS,
+-                               ELF::SHF_MERGE |
+-                               ELF::SHF_STRINGS,
+-                               SectionKind::getReadOnly(),
+-                               1, "");
+-
+-  getStreamer().PushSection();
+-  getStreamer().SwitchSection(Comment);
+-  if (!SeenIdent) {
+-    getStreamer().EmitIntValue(0, 1);
+-    SeenIdent = true;
+-  }
+-  getStreamer().EmitBytes(Data, 0);
+-  getStreamer().EmitIntValue(0, 1);
+-  getStreamer().PopSection();
++  getStreamer().EmitIdent(Data);
+   return false;
+ }
+ 
+diff --git a/lib/MC/MCPureStreamer.cpp b/lib/MC/MCPureStreamer.cpp
+index 9ccab93..c7efe78 100644
+--- a/lib/MC/MCPureStreamer.cpp
++++ b/lib/MC/MCPureStreamer.cpp
+@@ -93,6 +93,9 @@ public:
+   virtual void EmitFileDirective(StringRef Filename) {
+     report_fatal_error("unsupported directive in pure streamer");
+   }
++  virtual void EmitIdent(StringRef IdentString) {
++    report_fatal_error("unsupported directive in pure streamer");
++  }
+   virtual bool EmitDwarfFileDirective(unsigned FileNo, StringRef Directory,
+                                       StringRef Filename) {
+     report_fatal_error("unsupported directive in pure streamer");
+diff --git a/lib/MC/WinCOFFStreamer.cpp b/lib/MC/WinCOFFStreamer.cpp
+index 702eec0..369071a 100644
+--- a/lib/MC/WinCOFFStreamer.cpp
++++ b/lib/MC/WinCOFFStreamer.cpp
+@@ -72,6 +72,7 @@ public:
+                               uint64_t Size, unsigned ByteAlignment);
+   virtual void EmitFileDirective(StringRef Filename);
+   virtual void EmitInstruction(const MCInst &Instruction);
++  virtual void EmitIdent(StringRef IdentString);
+   virtual void EmitWin64EHHandlerData();
+   virtual void FinishImpl();
+ 
+@@ -348,6 +349,11 @@ void WinCOFFStreamer::EmitInstruction(const MCInst &Instruction) {
+   getAssembler().getEmitter().EncodeInstruction(Instruction, VecOS,
+                                                 Fragment->getFixups());
+ }
++
++// TODO: Implement this if you want to emit .comment section in COFF obj files.
++void WinCOFFStreamer::EmitIdent(StringRef IdentString) {
++  llvm_unreachable("unsupported directive");
++}
+ 
+ void WinCOFFStreamer::EmitWin64EHHandlerData() {
+   MCStreamer::EmitWin64EHHandlerData();
+diff --git a/lib/Target/NVPTX/MCTargetDesc/NVPTXMCAsmInfo.cpp b/lib/Target/NVPTX/MCTargetDesc/NVPTXMCAsmInfo.cpp
+index 1d41665..ab69b5b 100644
+--- a/lib/Target/NVPTX/MCTargetDesc/NVPTXMCAsmInfo.cpp
++++ b/lib/Target/NVPTX/MCTargetDesc/NVPTXMCAsmInfo.cpp
+@@ -42,6 +42,7 @@ NVPTXMCAsmInfo::NVPTXMCAsmInfo(const Target &T, const StringRef &TT) {
+   HasSetDirective = false;
+ 
+   HasSingleParameterDotFile = false;
++  HasIdentDirective = false;
+ 
+   InlineAsmStart = " inline asm";
+   InlineAsmEnd = " inline asm";
+diff --git a/lib/VMCore/Verifier.cpp b/lib/VMCore/Verifier.cpp
+index eb40b09..95441dc 100644
+--- a/lib/VMCore/Verifier.cpp
++++ b/lib/VMCore/Verifier.cpp
+@@ -201,6 +201,8 @@ namespace {
+            E = M.named_metadata_end(); I != E; ++I)
+         visitNamedMDNode(*I);
+ 
++      visitModuleIdents(M);
++
+       // If the module is broken, abort at this time.
+       return abortIfBroken();
+     }
+@@ -241,6 +243,7 @@ namespace {
+     void visitGlobalAlias(GlobalAlias &GA);
+     void visitNamedMDNode(NamedMDNode &NMD);
+     void visitMDNode(MDNode &MD, Function *F);
++    void visitModuleIdents(Module &M);
+     void visitFunction(Function &F);
+     void visitBasicBlock(BasicBlock &BB);
+     using InstVisitor<Verifier>::visit;
+@@ -665,6 +668,24 @@ static bool VerifyAttributeCount(const AttrListPtr &Attrs, unsigned Params) {
+   return false;
+ }
+ 
++void Verifier::visitModuleIdents(Module &M) {
++  const NamedMDNode *Idents = M.getNamedMetadata("llvm.ident");
++  if (!Idents)
++    return;
++
++  // llvm.ident takes a list of metadata entry. Each entry has only one string.
++  // Scan each llvm.ident entry and make sure that this requirement is met.
++  for (unsigned i = 0, e = Idents->getNumOperands(); i != e; ++i) {
++    const MDNode *N = Idents->getOperand(i);
++    Assert1(N->getNumOperands() == 1,
++            "incorrect number of operands in llvm.ident metadata", N);
++    Assert1(isa<MDString>(N->getOperand(0)),
++            ("invalid value for llvm.ident metadata entry operand"
++             "(the operand should be a string)"),
++            N->getOperand(0));
++  }
++}
++
+ // visitFunction - Verify that a function is ok.
+ //
+ void Verifier::visitFunction(Function &F) {
+diff --git a/tools/lto/LTOModule.cpp b/tools/lto/LTOModule.cpp
+index ffdcbe6..3829b67 100644
+--- a/tools/lto/LTOModule.cpp
++++ b/tools/lto/LTOModule.cpp
+@@ -789,6 +789,7 @@ namespace {
+     virtual bool EmitValueToOffset(const MCExpr *Offset,
+                                    unsigned char Value ) { return false; }
+     virtual void EmitFileDirective(StringRef Filename) {}
++    virtual void EmitIdent(StringRef IdentString) {}
+     virtual void EmitDwarfAdvanceLineAddr(int64_t LineDelta,
+                                           const MCSymbol *LastLabel,
+                                           const MCSymbol *Label,

@@ -1,0 +1,68 @@
+diff -ur a/bfd/elf.c b/bfd/elf.c
+--- a/bfd/elf.c	2013-03-25 09:06:19.000000000 +0100
++++ b/bfd/elf.c	2014-06-19 17:07:56.803669530 +0200
+@@ -863,10 +863,15 @@
+     flags |= SEC_DATA;
+   if ((hdr->sh_flags & SHF_MERGE) != 0)
+     {
++#if 0 /* turn this off because DIABLO can't handle it */
+       flags |= SEC_MERGE;
+       newsect->entsize = hdr->sh_entsize;
+       if ((hdr->sh_flags & SHF_STRINGS) != 0)
+ 	flags |= SEC_STRINGS;
++#else
++      flags &= ~(SEC_MERGE | SEC_STRINGS);
++      hdr->sh_flags &= ~(SHF_MERGE | SHF_STRINGS);
++#endif
+     }
+   if (hdr->sh_flags & SHF_GROUP)
+     if (!setup_group (abfd, hdr, newsect))
+@@ -2714,10 +2719,15 @@
+     this_hdr->sh_flags |= SHF_EXECINSTR;
+   if ((asect->flags & SEC_MERGE) != 0)
+     {
++#if 0 /* turn this off because DIABLO can't handle it */
+       this_hdr->sh_flags |= SHF_MERGE;
+       this_hdr->sh_entsize = asect->entsize;
+       if ((asect->flags & SEC_STRINGS) != 0)
+ 	this_hdr->sh_flags |= SHF_STRINGS;
++#else
++      this_hdr->sh_flags &= ~(SHF_MERGE | SHF_STRINGS);
++      asect->flags &= ~(SEC_MERGE | SEC_STRINGS);
++#endif
+     }
+   if ((asect->flags & SEC_GROUP) == 0 && elf_group_name (asect) != NULL)
+     this_hdr->sh_flags |= SHF_GROUP;
+diff -ur a/ld/ldlang.c b/ld/ldlang.c
+--- a/ld/ldlang.c	2013-03-25 09:06:23.000000000 +0100
++++ b/ld/ldlang.c	2014-06-19 17:07:56.815669529 +0200
+@@ -2315,6 +2315,7 @@
+      it from the output section.  */
+   output->bfd_section->flags &= flags | ~SEC_READONLY;
+ 
++#if 0
+   if (output->bfd_section->linker_has_input)
+     {
+       /* Only set SEC_READONLY flag on the first input section.  */
+@@ -2331,6 +2332,10 @@
+ 	}
+     }
+   output->bfd_section->flags |= flags;
++#else
++  output->bfd_section->flags |= flags;
++  flags &= ~(SEC_MERGE | SEC_STRINGS);
++#endif
+ 
+   if (!output->bfd_section->linker_has_input)
+     {
+@@ -2342,8 +2347,10 @@
+ 				     link_info.output_bfd,
+ 				     output->bfd_section,
+ 				     &link_info);
++#if 0
+       if ((flags & SEC_MERGE) != 0)
+ 	output->bfd_section->entsize = section->entsize;
++#endif
+     }
+ 
+   if ((flags & SEC_TIC54X_BLOCK) != 0

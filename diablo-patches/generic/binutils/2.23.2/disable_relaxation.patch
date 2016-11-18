@@ -1,0 +1,141 @@
+diff -ur a/gas/config/tc-arm.c b/gas/config/tc-arm.c
+--- a/gas/config/tc-arm.c	2013-03-25 09:06:21.000000000 +0100
++++ b/gas/config/tc-arm.c	2014-06-19 17:11:43.195665226 +0200
+@@ -46,6 +46,8 @@
+ /* Must be at least the size of the largest unwind opcode (currently two).  */
+ #define ARM_OPCODE_CHUNK_SIZE 8
+ 
++#define TC_FAKE_LABEL(NAME) (strcmp ((NAME), FAKE_LABEL_NAME) == 0)
++
+ /* This structure holds the unwinding state.  */
+ 
+ static struct
+@@ -23014,9 +23016,9 @@
+     return 1;
+ 
+   /* Always generate relocations against function symbols.  */
+-  if (fixp->fx_r_type == BFD_RELOC_32
+-      && fixp->fx_addsy
+-      && (symbol_get_bfdsym (fixp->fx_addsy)->flags & BSF_FUNCTION))
++  if (fixp->fx_r_type == BFD_RELOC_32)
++      /*&& fixp->fx_addsy*/
++      /*&& (symbol_get_bfdsym (fixp->fx_addsy)->flags & BSF_FUNCTION))*/
+     return 1;
+ 
+   return generic_force_reloc (fixp);
+@@ -23089,7 +23091,12 @@
+       || fixP->fx_r_type == BFD_RELOC_ARM_THUMB_MOVT_PCREL)
+     return FALSE;
+ 
+-  return TRUE;
++  /* DIABLO */
++  if(TC_FAKE_LABEL(S_GET_NAME(fixP->fx_addsy)))
++    return TRUE;
++  symbol_get_bfdsym(fixP->fx_addsy)->flags |= BSF_KEEP;
++
++  return FALSE;
+ }
+ #endif /* defined (OBJ_ELF) || defined (OBJ_COFF) */
+ 
+Only in b/gas/config: tc-arm.c.orig
+diff -ur a/gas/config/tc-i386.c b/gas/config/tc-i386.c
+--- a/gas/config/tc-i386.c	2012-11-09 14:32:04.000000000 +0100
++++ b/gas/config/tc-i386.c	2014-06-19 17:11:06.819665917 +0200
+@@ -2771,7 +2771,9 @@
+       || fixP->fx_r_type == BFD_RELOC_VTABLE_ENTRY)
+     return 0;
+ #endif
+-  return 1;
++  /* DIABLO doesn't work well with relaxation. */
++  /*return 1;*/
++  return 0;
+ }
+ 
+ static int
+diff -ur a/gas/config/tc-ia64.c b/gas/config/tc-ia64.c
+--- a/gas/config/tc-ia64.c	2012-09-04 15:55:27.000000000 +0200
++++ b/gas/config/tc-ia64.c	2014-06-19 17:11:06.819665917 +0200
+@@ -10990,7 +10990,9 @@
+       break;
+     }
+ 
+-  return 1;
++  /* DIABLO doesn't like relaxation. */
++  /*return 1;*/
++  return 0;
+ }
+ 
+ int
+diff -ur a/gas/config/tc-mips.c b/gas/config/tc-mips.c
+--- a/gas/config/tc-mips.c	2012-09-04 16:21:03.000000000 +0200
++++ b/gas/config/tc-mips.c	2014-06-19 17:11:06.823665917 +0200
+@@ -17650,7 +17650,9 @@
+     return 0;
+ #endif
+ 
+-  return 1;
++  /* Turn relaxation off for DIABLO */
++  /*return 1;*/
++  return 0;
+ }
+ 
+ /* Translate internal representation of relocation info to BFD target
+diff -ur a/gas/config/tc-ppc.c b/gas/config/tc-ppc.c
+--- a/gas/config/tc-ppc.c	2013-03-25 09:06:21.000000000 +0100
++++ b/gas/config/tc-ppc.c	2014-06-19 17:11:06.823665917 +0200
+@@ -5440,7 +5440,9 @@
+ int
+ ppc_pe_fix_adjustable (fixS *fix)
+ {
+-  return fix->fx_r_type != BFD_RELOC_PPC_TOC16;
++  /*return fix->fx_r_type != BFD_RELOC_PPC_TOC16;*/
++  /* Turn relaxation off for DIABLO */
++  return 0;
+ }
+ 
+ #endif
+@@ -6173,17 +6175,19 @@
+ int
+ ppc_fix_adjustable (fixS *fix)
+ {
+-  return (fix->fx_r_type != BFD_RELOC_16_GOTOFF
+-	  && fix->fx_r_type != BFD_RELOC_LO16_GOTOFF
+-	  && fix->fx_r_type != BFD_RELOC_HI16_GOTOFF
+-	  && fix->fx_r_type != BFD_RELOC_HI16_S_GOTOFF
+-	  && fix->fx_r_type != BFD_RELOC_PPC64_GOT16_DS
+-	  && fix->fx_r_type != BFD_RELOC_PPC64_GOT16_LO_DS
+-	  && fix->fx_r_type != BFD_RELOC_GPREL16
+-	  && fix->fx_r_type != BFD_RELOC_VTABLE_INHERIT
+-	  && fix->fx_r_type != BFD_RELOC_VTABLE_ENTRY
+-	  && !(fix->fx_r_type >= BFD_RELOC_PPC_TLS
+-	       && fix->fx_r_type <= BFD_RELOC_PPC64_DTPREL16_HIGHESTA));
++  /* Turn relaxation off for DIABLO */
++  /*return (fix->fx_r_type != BFD_RELOC_16_GOTOFF*/
++	  /*&& fix->fx_r_type != BFD_RELOC_LO16_GOTOFF*/
++	  /*&& fix->fx_r_type != BFD_RELOC_HI16_GOTOFF*/
++	  /*&& fix->fx_r_type != BFD_RELOC_HI16_S_GOTOFF*/
++	  /*&& fix->fx_r_type != BFD_RELOC_PPC64_GOT16_DS*/
++	  /*&& fix->fx_r_type != BFD_RELOC_PPC64_GOT16_LO_DS*/
++	  /*&& fix->fx_r_type != BFD_RELOC_GPREL16*/
++	  /*&& fix->fx_r_type != BFD_RELOC_VTABLE_INHERIT*/
++	  /*&& fix->fx_r_type != BFD_RELOC_VTABLE_ENTRY*/
++	  /*&& !(fix->fx_r_type >= BFD_RELOC_PPC_TLS*/
++	       /*&& fix->fx_r_type <= BFD_RELOC_PPC64_DTPREL16_HIGHESTA));*/
++  return 0;
+ }
+ #endif
+ 
+diff -ur a/gas/config/tc-sh.c b/gas/config/tc-sh.c
+--- a/gas/config/tc-sh.c	2012-03-21 09:58:40.000000000 +0100
++++ b/gas/config/tc-sh.c	2014-06-19 17:11:06.823665917 +0200
+@@ -3879,7 +3879,9 @@
+       || fixP->fx_r_type == BFD_RELOC_VTABLE_ENTRY)
+     return 0;
+ 
+-  return 1;
++  /* DIABLO doesn't like relaxation */
++  /*return 1;*/
++  return 0;
+ }
+ 
+ void

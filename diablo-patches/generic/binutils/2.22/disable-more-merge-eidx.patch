@@ -1,0 +1,12 @@
+--- a/bfd/elf32-arm.c	2014-01-29 16:37:46.304489327 +0100
++++ b/bfd/elf32-arm.c	2014-01-29 16:37:28.720488620 +0100
+@@ -10649,7 +10649,8 @@
+ 	  /* An EXIDX_CANTUNWIND entry.  */
+ 	  if (second_word == 1)
+ 	    {
+-	      if (last_unwind_type == 0)
++	      if (merge_exidx_entries
++		   && last_unwind_type == 0)
+ 		elide = 1;
+ 	      unwind_type = 0;
+ 	    }

@@ -1,0 +1,14 @@
+diff -ru a/gcc/Makefile.in b/gcc/Makefile.in
+--- a/gcc/Makefile.in	2015-05-04 12:46:32.000000000 +0200
++++ b/gcc/Makefile.in	2016-02-09 09:39:52.237846727 +0100
+@@ -2393,8 +2393,8 @@
+ 	$(STAMP) s-gtype
+ 
+ generated_files = config.h tm.h $(TM_P_H) $(TM_H) multilib.h \
+-       $(simple_generated_h) specs.h \
+-       tree-check.h genrtl.h insn-modes.h tm-preds.h tm-constrs.h \
++       $(simple_generated_h) specs.h tree-check.h insn-opinit.h \
++       genrtl.h insn-modes.h tm-preds.h tm-constrs.h \
+        $(ALL_GTFILES_H) gtype-desc.c gtype-desc.h gcov-iov.h \
+        options.h target-hooks-def.h insn-opinit.h \
+        common/common-target-hooks-def.h pass-instances.def \

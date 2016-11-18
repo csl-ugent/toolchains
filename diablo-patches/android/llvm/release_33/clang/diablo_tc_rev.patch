@@ -1,0 +1,14 @@
+diff --git a/lib/Basic/Version.cpp b/lib/Basic/Version.cpp
+index e219a3d..c118dac 100644
+--- a/lib/Basic/Version.cpp
++++ b/lib/Basic/Version.cpp
+@@ -122,7 +122,8 @@ std::string getClangFullVersion() {
+   OS << CLANG_VENDOR;
+ #endif
+   OS << "clang version " CLANG_VERSION_STRING " "
+-     << getClangFullRepositoryVersion();
++     << getClangFullRepositoryVersion()
++     << DIABLO_TC_REV;
+ 
+   // If vendor supplied, include the base LLVM version as well.
+ #ifdef CLANG_VENDOR

@@ -1,0 +1,26 @@
+--- a/gas/as.c	2012-06-07 14:47:23.000000000 +0200
++++ b/gas/as.c	2015-02-10 16:17:15.516479817 +0100
+@@ -1265,6 +1265,23 @@
+     }
+ #endif
+ 
++    {
++#define DIABLO_COMMENT DIABLO_GAS_COMMENT
++      segT diablo_comment;
++      size_t size;
++      char *cp;
++
++      diablo_comment = subseg_force_new(".comment", 0);
++      bfd_set_section_flags (stdoutput, diablo_comment,
++            SEC_READONLY | SEC_DATA);
++
++      size = strlen (DIABLO_COMMENT) + 1;
++      cp = frag_more (size);
++      memcpy (cp, DIABLO_COMMENT, size);
++
++      cp[size-1] = '\0';
++    }
++
+   /* If we've been collecting dwarf2 .debug_line info, either for
+      assembly debugging or on behalf of the compiler, emit it now.  */
+   dwarf2_finish ();

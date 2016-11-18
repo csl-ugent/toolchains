@@ -1,0 +1,299 @@
+diff -r -u a/gas/config/obj-elf.c b/gas/config/obj-elf.c
+--- a/gas/config/obj-elf.c	2014-08-22 11:21:37.949843432 +0200
++++ b/gas/config/obj-elf.c	2014-08-22 11:19:32.457343776 +0200
+@@ -1561,6 +1561,7 @@
+       return;
+     }
+   input_line_pointer++;
++  exp.X_diablo_ignore = 1;
+   expression (&exp);
+   if (exp.X_op == O_absent)
+     {
+diff -r -u a/gas/config/tc-arm.c b/gas/config/tc-arm.c
+--- a/gas/config/tc-arm.c	2014-08-22 11:21:37.953843447 +0200
++++ b/gas/config/tc-arm.c	2014-08-22 11:19:32.373343442 +0200
+@@ -3260,6 +3260,10 @@
+       int reloc;
+       char *base = input_line_pointer;
+ 
++      /* Diablo; all non relevant by default */
++      exp.X_diablo_relevant = 0;
++      exp.X_diablo_ignore = 0;
++
+       expression (& exp);
+ 
+       if (exp.X_op != O_symbol)
+diff -r -u a/gas/dw2gencfi.c b/gas/dw2gencfi.c
+--- a/gas/dw2gencfi.c	2014-08-22 11:21:37.953843447 +0200
++++ b/gas/dw2gencfi.c	2014-08-22 11:19:35.393355467 +0200
+@@ -257,6 +257,9 @@
+ {
+   expressionS exp;
+ 
++  /* Diablo; no expressions were parsed up to here */
++  exp.X_diablo_relevant = 0;
++
+   exp.X_op = O_symbol;
+   exp.X_add_symbol = symbol;
+   exp.X_add_number = 0;
+@@ -1422,6 +1425,9 @@
+   int enc;
+   enum dwarf2_format fmt = DWARF2_FORMAT (now_seg);
+ 
++  /* Diablo; no expressions were parsed up to here */
++  exp.X_diablo_relevant = 0;
++
+   cie->start_address = symbol_temp_new_now ();
+   after_size_address = symbol_temp_make ();
+   end_address = symbol_temp_make ();
+@@ -1545,6 +1551,9 @@
+   int offset_size;
+   int addr_size;
+ 
++  /* Diablo; no expressions were parsed up to here */
++  exp.X_diablo_relevant = 0;
++
+   after_size_address = symbol_temp_make ();
+   end_address = symbol_temp_make ();
+ 
+diff -r -u a/gas/dwarf2dbg.c b/gas/dwarf2dbg.c
+--- a/gas/dwarf2dbg.c	2014-08-22 11:21:37.953843447 +0200
++++ b/gas/dwarf2dbg.c	2014-08-22 11:19:35.273354990 +0200
+@@ -872,6 +872,9 @@
+ {
+   expressionS exp;
+ 
++  /* Diablo; no expressions were parsed up to here */
++  exp.X_diablo_relevant = 0;
++
+   out_opcode (DW_LNS_extended_op);
+   out_uleb128 (sizeof_address + 1);
+ 
+@@ -1455,6 +1458,9 @@
+   exp->X_add_symbol = end_sym;
+   exp->X_op_symbol = start_sym;
+ 
++  /* Diablo; no expressions were parsed up to here */
++  exp->X_diablo_relevant = 0;
++
+   switch (DWARF2_FORMAT (sec))
+     {
+     case dwarf2_format_32bit:
+diff -r -u a/gas/expr.c b/gas/expr.c
+--- a/gas/expr.c	2014-08-22 11:21:37.953843447 +0200
++++ b/gas/expr.c	2014-08-22 11:19:32.517344015 +0200
+@@ -1737,6 +1737,8 @@
+   if (rank == 0)
+     dot_value = frag_now_fix ();
+ 
++  /* Diablo where does this expression start? */
++  resultP->X_fp_start = input_line_pointer-1;
+   retval = operand (resultP, mode);
+ 
+   /* operand () gobbles spaces.  */
+@@ -1751,7 +1753,13 @@
+       input_line_pointer += op_chars;	/* -> after operator.  */
+ 
+       right.X_md = 0;
++      right.X_diablo_ignore = resultP->X_diablo_ignore;
++      right.X_diablo_relevant = resultP->X_diablo_relevant;
+       rightseg = expr (op_rank[(int) op_left], &right, mode);
++
++      /* Diablo pass on the relevant flag */
++      resultP->X_diablo_relevant = right.X_diablo_relevant;
++
+       if (right.X_op == O_absent)
+ 	{
+ 	  as_warn (_("missing operand; zero assumed"));
+@@ -1851,6 +1859,17 @@
+ 	  resultP->X_add_number -= frag_off / OCTETS_PER_BYTE;
+ 	  resultP->X_add_number += (S_GET_VALUE (resultP->X_add_symbol)
+ 				    - S_GET_VALUE (right.X_add_symbol));
++
++    /* Diablo */
++    if(!resultP->X_diablo_ignore)
++    {
++      resultP->X_diablo_relevant = 1;
++
++      /* Diablo: prevent gas from removing these symbols later on. */
++      symbol_mark_used_in_reloc(resultP->X_add_symbol);
++      symbol_mark_used_in_reloc(right.X_add_symbol);
++    }
++
+ 	  resultP->X_op = O_constant;
+ 	  resultP->X_add_symbol = 0;
+ 	}
+@@ -1964,6 +1983,16 @@
+ 		  rightseg = absolute_section;
+ 		}
+ 	    }
++
++      /* Diablo */
++      if(!resultP->X_diablo_ignore)
++      {
++        resultP->X_diablo_relevant = 1;
++
++        /* Diablo: prevent gas from removing these symbols later on. */
++        symbol_mark_used_in_reloc(resultP->X_add_symbol);
++        symbol_mark_used_in_reloc(right.X_add_symbol);
++      }
+ 	}
+       else
+ 	{
+@@ -2012,6 +2041,9 @@
+   if (rank == 0 && mode == expr_evaluate)
+     resolve_expression (resultP);
+ 
++  /* Diablo where does this expression end? */
++  resultP->X_fp_end = input_line_pointer;
++
+   return resultP->X_op == O_constant ? absolute_section : retval;
+ }
+ 
+diff -r -u a/gas/expr.h b/gas/expr.h
+--- a/gas/expr.h	2014-08-22 11:21:37.953843447 +0200
++++ b/gas/expr.h	2014-08-22 11:19:35.293355069 +0200
+@@ -138,9 +138,15 @@
+   unsigned int X_unsigned : 1;
+ 
+   /* 7 additional bits can be defined if needed.  */
++  /* Is or descents from an expression relevant for Diablo; subtraction of two
++     labels */
++  unsigned int X_diablo_relevant : 1;
++  unsigned int X_diablo_ignore : 1;
+ 
+   /* Machine dependent field */
+   unsigned short X_md;
++
++  char *X_fp_start, *X_fp_end;
+ } expressionS;
+ 
+ enum expr_mode
+diff -r -u a/gas/read.c b/gas/read.c
+--- a/gas/read.c	2012-06-09 15:22:00.000000000 +0200
++++ b/gas/read.c	2015-02-17 14:38:42.825679681 +0100
+@@ -254,6 +254,7 @@
+ static size_t get_non_macro_line_sb (sb *);
+ static void generate_file_debug (void);
+ static char *_find_end_of_line (char *, int, int, int);
++static void generate_diablo_symbol(expressionS *exp, int nbytes, int sign);
+ 
+ void
+ read_begin (void)
+@@ -505,6 +506,7 @@
+ get_absolute_expression (void)
+ {
+   expressionS exp;
++  exp.X_diablo_ignore = 1;
+ 
+   return get_absolute_expr (&exp);
+ }
+@@ -4025,6 +4027,10 @@
+   char *stop = NULL;
+   char stopc = 0;
+ 
++  /* Mark all as non relevant by default */
++  exp.X_diablo_relevant = 0;
++  exp.X_diablo_ignore = 0;
++
+ #ifdef md_flush_pending_output
+   md_flush_pending_output ();
+ #endif
+@@ -4212,6 +4218,38 @@
+     mri_comment_end (stop, stopc);
+ }
+ 
++static void
++generate_diablo_symbol(expressionS *exp, int nbytes, int sign)
++{
++  /* Don't emit $diablo symbols in debug information data.
++   * Here we don't emit $diablo symbols in sections of which the name starts with ".debug". */
++  if (strncmp(segment_name(now_seg), ".debug", 6) == 0)
++    return;
++
++  if (exp->X_diablo_relevant
++          && exp->X_fp_start != NULL
++          && exp->X_fp_end != NULL)
++  {
++    int exp_length = exp->X_fp_end - exp->X_fp_start;
++    char *new_sym_name = (char *) xmalloc(exp_length + strlen("$diablo:::")
++            + ((nbytes < 10) ? 1 : (nbytes < 100) ? 2 : 3)
++            + 1);
++
++    /* build & write symbol
++          sign -1     not a leb
++                0     unsigned leb
++                1     signed leb
++          nbytes x    size in bytes
++                 -1   unknown at this moment */
++    sprintf (new_sym_name, "$diablo:%s:%.0d:%.*s",
++        (sign < 0) ? "" : (sign == 0) ? "u" : "s",
++        (nbytes > 0) ? nbytes : 0,
++        (*(exp->X_fp_start) == ' ') ? exp_length-1 : exp_length,
++        (*(exp->X_fp_start) == ' ') ? exp->X_fp_start+1 : exp->X_fp_start);
++    symbol_new (new_sym_name, now_seg, (valueT) frag_now_fix (), frag_now);
++  }
++}
++
+ /* Put the contents of expression EXP into the object file using
+    NBYTES bytes.  If need_pass_2 is 1, this does nothing.  */
+ 
+@@ -4231,6 +4269,8 @@
+   frag_grow (nbytes);
+   dot_value = frag_now_fix ();
+ 
++  generate_diablo_symbol(exp, nbytes, -1);
++
+ #ifndef NO_LISTING
+ #ifdef OBJ_ELF
+   /* When gcc emits DWARF 1 debugging pseudo-ops, a line number will
+@@ -5223,6 +5263,7 @@
+ {
+   operatorT op = exp->X_op;
+   unsigned int nbytes;
++  int size;
+ 
+   if (op == O_absent || op == O_illegal)
+     {
+@@ -5268,10 +5309,10 @@
+       /* If we've got a constant, emit the thing directly right now.  */
+ 
+       valueT value = exp->X_add_number;
+-      int size;
+       char *p;
+ 
+       size = sizeof_leb128 (value, sign);
++      generate_diablo_symbol(exp, size, sign);
+       p = frag_more (size);
+       output_leb128 (p, value, sign);
+     }
+@@ -5279,10 +5320,10 @@
+     {
+       /* O_big is a different sort of constant.  */
+ 
+-      int size;
+       char *p;
+ 
+       size = output_big_leb128 (NULL, generic_bignum, exp->X_add_number, sign);
++      generate_diablo_symbol(exp, size, sign);
+       p = frag_more (size);
+       output_big_leb128 (p, generic_bignum, exp->X_add_number, sign);
+     }
+@@ -5290,6 +5331,8 @@
+     {
+       /* Otherwise, we have to create a variable sized fragment and
+ 	 resolve things later.  */
++	size = -1;
++	generate_diablo_symbol(exp, size, sign);
+ 
+       frag_var (rs_leb128, sizeof_uleb128 (~(valueT) 0), 0, sign,
+ 		make_expr_symbol (exp), 0, (char *) NULL);
+@@ -5303,6 +5346,8 @@
+ {
+   expressionS exp;
+ 
++  exp.X_diablo_ignore = 0;
++
+ #ifdef md_flush_pending_output
+   md_flush_pending_output ();
+ #endif

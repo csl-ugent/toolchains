@@ -1,0 +1,27 @@
+diff -ru a/gcc/final.c b/gcc/final.c
+--- a/gcc/final.c	2016-02-09 09:02:34.874150166 +0100
++++ b/gcc/final.c	2016-02-09 09:03:00.775397143 +0100
+@@ -263,12 +263,15 @@
+ /* Enable APP processing of subsequent output.
+    Used before the output from an `asm' statement.  */
+ 
++static int asmcount=1;
+ void
+ app_enable (void)
+ {
++  
+   if (! app_on)
+     {
+       fputs (ASM_APP_ON, asm_out_file);
++      fprintf(asm_out_file,"$handwritten%d:\n",asmcount++);
+       app_on = 1;
+     }
+ }
+@@ -282,6 +285,7 @@
+   if (app_on)
+     {
+       fputs (ASM_APP_OFF, asm_out_file);
++      fprintf(asm_out_file,"$compiler%d:\n",asmcount++);
+       app_on = 0;
+     }
+ }

@@ -1,0 +1,99 @@
+diff --git a/include/llvm/MC/MCStreamer.h b/include/llvm/MC/MCStreamer.h
+index 2cab481..16148f4 100644
+--- a/include/llvm/MC/MCStreamer.h
++++ b/include/llvm/MC/MCStreamer.h
+@@ -280,6 +280,8 @@ namespace llvm {
+ 
+     virtual void EmitDebugLabel(MCSymbol *Symbol);
+ 
++    virtual void EmitDiabloHandwritten(bool on) {};
++
+     virtual void EmitEHSymAttributes(const MCSymbol *Symbol,
+                                      MCSymbol *EHSymbol);
+ 
+diff --git a/lib/CodeGen/AsmPrinter/AsmPrinterInlineAsm.cpp b/lib/CodeGen/AsmPrinter/AsmPrinterInlineAsm.cpp
+index abfa330..61416ff 100644
+--- a/lib/CodeGen/AsmPrinter/AsmPrinterInlineAsm.cpp
++++ b/lib/CodeGen/AsmPrinter/AsmPrinterInlineAsm.cpp
+@@ -429,9 +429,10 @@ void AsmPrinter::EmitInlineAsm(const MachineInstr *MI) const {
+   if (AsmStr[0] == 0) {
+     // Don't emit the comments if writing to a .o file.
+     if (!OutStreamer.hasRawTextSupport()) return;
+-
++    OutStreamer.EmitDiabloHandwritten(true);
+     OutStreamer.EmitRawText(Twine("\t")+MAI->getCommentString()+
+                             MAI->getInlineAsmStart());
++    OutStreamer.EmitDiabloHandwritten(false);
+     OutStreamer.EmitRawText(Twine("\t")+MAI->getCommentString()+
+                             MAI->getInlineAsmEnd());
+     return;
+@@ -439,9 +440,11 @@ void AsmPrinter::EmitInlineAsm(const MachineInstr *MI) const {
+ 
+   // Emit the #APP start marker.  This has to happen even if verbose-asm isn't
+   // enabled, so we use EmitRawText.
+-  if (OutStreamer.hasRawTextSupport())
++  if (OutStreamer.hasRawTextSupport()) {
++    OutStreamer.EmitDiabloHandwritten(true);
+     OutStreamer.EmitRawText(Twine("\t")+MAI->getCommentString()+
+                             MAI->getInlineAsmStart());
++  }
+ 
+   // Get the !srcloc metadata node if we have it, and decode the loc cookie from
+   // it.
+@@ -477,9 +480,11 @@ void AsmPrinter::EmitInlineAsm(const MachineInstr *MI) const {
+ 
+   // Emit the #NOAPP end marker.  This has to happen even if verbose-asm isn't
+   // enabled, so we use EmitRawText.
+-  if (OutStreamer.hasRawTextSupport())
++  if (OutStreamer.hasRawTextSupport()) {
++    OutStreamer.EmitDiabloHandwritten(false);
+     OutStreamer.EmitRawText(Twine("\t")+MAI->getCommentString()+
+                             MAI->getInlineAsmEnd());
++  }
+ }
+ 
+ 
+diff --git a/lib/MC/MCAsmStreamer.cpp b/lib/MC/MCAsmStreamer.cpp
+index 9e86785..cbe92a7 100644
+--- a/lib/MC/MCAsmStreamer.cpp
++++ b/lib/MC/MCAsmStreamer.cpp
+@@ -58,6 +58,9 @@ private:
+                        EHPrivateExtern  = 1 << 2 };
+   DenseMap<const MCSymbol*, unsigned> FlagMap;
+ 
++  // Use this to generate unique '$handwritten: x'
++  int HandwritenAsmCount;
++
+   bool needsSet(const MCExpr *Value);
+ 
+   void EmitRegisterName(int64_t Register);
+@@ -75,7 +78,7 @@ public:
+       InstPrinter(printer), Emitter(emitter), AsmBackend(asmbackend),
+       CommentStream(CommentToEmit), IsVerboseAsm(isVerboseAsm),
+       ShowInst(showInst), UseLoc(useLoc), UseCFI(useCFI),
+-      UseDwarfDirectory(useDwarfDirectory) {
++      UseDwarfDirectory(useDwarfDirectory), HandwritenAsmCount(0) {
+     if (InstPrinter && IsVerboseAsm)
+       InstPrinter->setCommentStream(CommentStream);
+   }
+@@ -138,6 +141,7 @@ public:
+   virtual void EmitLabel(MCSymbol *Symbol);
+   virtual void EmitDebugLabel(MCSymbol *Symbol);
+ 
++  virtual void EmitDiabloHandwritten(bool on);
+   virtual void EmitEHSymAttributes(const MCSymbol *Symbol,
+                                    MCSymbol *EHSymbol);
+   virtual void EmitAssemblerFlag(MCAssemblerFlag Flag);
+@@ -366,6 +370,12 @@ void MCAsmStreamer::EmitDebugLabel(MCSymbol *Symbol) {
+   EmitEOL();
+ }
+ 
++void MCAsmStreamer::EmitDiabloHandwritten(bool on) {
++    OS << (on ? "$handwritten" : "$compiler") << HandwritenAsmCount << ":";
++    if (!on) HandwritenAsmCount++;
++    EmitEOL();
++}
++
+ void MCAsmStreamer::EmitAssemblerFlag(MCAssemblerFlag Flag) {
+   switch (Flag) {
+   case MCAF_SyntaxUnified:         OS << "\t.syntax unified"; break;

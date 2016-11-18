@@ -1,0 +1,26 @@
+diff --git a/build/tools/build-gcc.sh b/build/tools/build-gcc.sh
+index 7d5becd..883257e 100755
+--- a/build/tools/build-gcc.sh
++++ b/build/tools/build-gcc.sh
+@@ -57,6 +57,12 @@ do_binutils_version () {
+     EXPLICIT_BINUTILS_VERSION=true
+ }
+ 
++DIABLO_TC_VER=DiabloTC-none
++register_option "--diablotc-version=<diablotc version>" do_diablotc_version "Specify Diablo toolchains version" "$DIABLO_TC_VER"
++do_diablotc_version () {
++    DIABLO_TC_VER=$1
++}
++
+ GMP_VERSION=$DEFAULT_GMP_VERSION
+ register_var_option "--gmp-version=<version>" GMP_VERSION "Specify gmp version"
+ 
+@@ -349,6 +355,8 @@ esac
+ # Enable linker option -eh-frame-hdr also for static executable
+ EXTRA_CONFIG_FLAGS=$EXTRA_CONFIG_FLAGS" --enable-eh-frame-hdr-for-static"
+ 
++EXTRA_CONFIG_FLAGS=$EXTRA_CONFIG_FLAGS" --with-pkgversion=$DIABLO_TC_VER"
++
+ MAY_FAIL_DUE_TO_RACE_CONDITION=
+ if [ "$MINGW" = "yes" -o "$DARWIN" = "yes" ]; then
+    MAY_FAIL_DUE_TO_RACE_CONDITION=yes

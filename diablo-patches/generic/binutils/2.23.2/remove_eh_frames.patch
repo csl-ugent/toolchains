@@ -1,0 +1,45 @@
+diff -ur a/bfd/elf-eh-frame.c b/bfd/elf-eh-frame.c
+--- a/bfd/elf-eh-frame.c	2012-05-25 03:12:19.000000000 +0200
++++ b/bfd/elf-eh-frame.c	2014-06-20 10:28:40.862482320 +0200
+@@ -512,6 +512,22 @@
+       && bfd_get_32 (abfd, ehbuf) == 0
+       && cookie->rel == cookie->relend)
+     {
++      /* An empty basket is still a basket... so we setup this eh_frame as
++       * a real one. */
++      sec_info = (struct eh_frame_sec_info *)
++          bfd_zmalloc (sizeof (struct eh_frame_sec_info) + sizeof (struct eh_cie_fde));
++
++      elf_section_data (sec)->sec_info = sec_info;
++      REQUIRE (sec_info);
++
++      local_cies = (struct cie *) bfd_zmalloc (sizeof (*local_cies));
++      REQUIRE (local_cies);
++
++      sec_info->cies = local_cies;
++      sec_info->count = 1;
++
++      sec->sec_info_type = SEC_INFO_TYPE_EH_FRAME;
++
+       /* Empty .eh_frame section.  */
+       free (ehbuf);
+       return;
+@@ -1144,6 +1160,10 @@
+   if (sec_info == NULL)
+     return FALSE;
+ 
++  for(ent = sec_info->entry; ent < (sec_info->entry + sec_info->count); ++ent)
++    ent->removed = 1;
++
++#if 0
+   ptr_size = (get_elf_backend_data (sec->owner)
+ 	      ->elf_backend_eh_frame_address_size (sec->owner, sec));
+ 
+@@ -1195,6 +1215,7 @@
+ 						  cookie, ent->u.fde.cie_inf);
+ 	  }
+       }
++#endif
+ 
+   if (sec_info->cies)
+     {

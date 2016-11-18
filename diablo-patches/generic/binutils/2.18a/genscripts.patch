@@ -1,0 +1,52 @@
+--- binutils-2.18a/ld/genscripts.sh	2013-07-09 11:48:56.000000000 +0200
++++ binutils-2.18a/ld/genscripts.sh.patched	2013-07-09 11:48:41.000000000 +0200
+@@ -391,23 +391,23 @@
+     *" ${EMULATION_NAME} "*) COMPILE_IN=true;;
+ esac
+ 
+-if test -n "${BASH+set}"; then
+-  source_em()
+-  {
+-    local current_script="$em_script"
+-    em_script=$1
+-    . $em_script
+-    em_script=$current_script
+-  }
+-  
+-  alias fragment='em_lineno=$LINENO; fragment_em'
+-  fragment_em()
+-  {
+-    local lineno=$[$em_lineno + 1]
+-    echo >> e${EMULATION_NAME}.c "#line $lineno \"$em_script\""
+-    cat >> e${EMULATION_NAME}.c
+-  }
+-else
++#if test -n "${BASH+set}"; then
++#  source_em()
++#  {
++#    local current_script="$em_script"
++#    em_script=$1
++#    . $em_script
++#    em_script=$current_script
++#  }
++#  
++#  alias fragment='em_lineno=$LINENO; fragment_em'
++#  fragment_em()
++#  {
++#    local lineno=$[$em_lineno + 1]
++#    echo >> e${EMULATION_NAME}.c "#line $lineno \"$em_script\""
++#    cat >> e${EMULATION_NAME}.c
++#  }
++#else
+   source_em()
+   {
+     . $1
+@@ -416,7 +416,7 @@
+   {
+     cat >> e${EMULATION_NAME}.c
+   }
+-fi
++#fi
+ 
+ # Generate e${EMULATION_NAME}.c.
+ # Start with an empty file, then the sourced .em script

@@ -1,0 +1,237 @@
+--- a/src/Grid_Generator_System.defs.hh
++++ b/src/Grid_Generator_System.defs.hh
+@@ -30,6 +30,7 @@ site: http://www.cs.unipr.it/ppl/ . */
+ #include "Variables_Set.types.hh"
+ #include "Grid.types.hh"
+ #include <iosfwd>
++#include <cstddef>
+ 
+ namespace Parma_Polyhedra_Library {
+ 
+@@ -267,7 +268,7 @@ public:
+   class const_iterator
+     : public std::iterator<std::forward_iterator_tag,
+ 			   Grid_Generator,
+-			   ptrdiff_t,
++			   std::ptrdiff_t,
+ 			   const Grid_Generator*,
+ 			   const Grid_Generator&>,
+       private Generator_System::const_iterator {
+--- a/src/Congruence_System.defs.hh
++++ b/src/Congruence_System.defs.hh
+@@ -33,6 +33,7 @@ site: http://www.cs.unipr.it/ppl/ . */
+ #include "Grid.types.hh"
+ #include "Grid_Certificate.types.hh"
+ #include <iosfwd>
++#include <cstddef>
+ 
+ namespace Parma_Polyhedra_Library {
+ 
+@@ -235,7 +236,7 @@ public:
+   class const_iterator
+     : public std::iterator<std::forward_iterator_tag,
+ 			   Congruence,
+-			   ptrdiff_t,
++			   std::ptrdiff_t,
+ 			   const Congruence*,
+ 			   const Congruence&> {
+   public:
+--- a/src/Constraint_System.defs.hh
++++ b/src/Constraint_System.defs.hh
+@@ -37,6 +37,7 @@
+ #include "termination.types.hh"
+ #include <iterator>
+ #include <iosfwd>
++#include <cstddef>
+ 
+ namespace Parma_Polyhedra_Library {
+ 
+@@ -609,7 +610,7 @@
+ class Parma_Polyhedra_Library::Constraint_System_const_iterator
+   : public std::iterator<std::forward_iterator_tag,
+                          Constraint,
+-                         ptrdiff_t,
++                         std::ptrdiff_t,
+                          const Constraint*,
+                          const Constraint&> {
+ public:
+--- a/src/Generator_System.defs.hh
++++ b/src/Generator_System.defs.hh
+@@ -33,6 +33,7 @@
+ #include "Poly_Con_Relation.defs.hh"
+ #include "Polyhedron.types.hh"
+ #include <iosfwd>
++#include <cstddef>
+ 
+ namespace Parma_Polyhedra_Library {
+ 
+@@ -679,7 +680,7 @@
+ class Parma_Polyhedra_Library::Generator_System_const_iterator
+   : public std::iterator<std::forward_iterator_tag,
+         Generator,
+-        ptrdiff_t,
++        std::ptrdiff_t,
+         const Generator*,
+         const Generator&> {
+ public:
+--- a/src/Linear_Expression.defs.hh	2015-02-26 11:07:24.485218668 +0100
++++ b/src/Linear_Expression.defs.hh	2015-02-26 11:08:03.551884630 +0100
+@@ -52,6 +52,8 @@
+ #include "Linear_Expression_Interface.defs.hh"
+ #include "Variable.defs.hh"
+ 
++#include <cstddef>
++
+ namespace Parma_Polyhedra_Library {
+ 
+ // Put them in the namespace here to declare them friend later.
+@@ -502,7 +504,7 @@
+   public:
+     typedef std::bidirectional_iterator_tag iterator_category;
+     typedef const Coefficient value_type;
+-    typedef ptrdiff_t difference_type;
++    typedef std::ptrdiff_t difference_type;
+     typedef value_type* pointer;
+     typedef Coefficient_traits::const_reference reference;
+ 
+--- a/src/Dense_Row.defs.hh	2015-02-26 11:08:56.231883679 +0100
++++ b/src/Dense_Row.defs.hh	2015-02-26 11:09:23.648549851 +0100
+@@ -33,6 +33,7 @@
+ #include <memory>
+ #include <vector>
+ #include <limits>
++#include <cstddef>
+ 
+ #ifdef PPL_DOXYGEN_INCLUDE_IMPLEMENTATION_DETAILS
+ //! A finite sequence of coefficients.
+@@ -433,7 +434,7 @@
+ 
+   typedef std::bidirectional_iterator_tag iterator_category;
+   typedef Coefficient value_type;
+-  typedef ptrdiff_t difference_type;
++  typedef std::ptrdiff_t difference_type;
+   typedef value_type* pointer;
+   typedef value_type& reference;
+ 
+@@ -474,7 +475,7 @@
+ public:
+ 
+   typedef const Coefficient value_type;
+-  typedef ptrdiff_t difference_type;
++  typedef std::ptrdiff_t difference_type;
+   typedef value_type* pointer;
+   typedef Coefficient_traits::const_reference reference;
+ 
+--- a/src/CO_Tree.defs.hh	2015-02-26 11:11:17.361881133 +0100
++++ b/src/CO_Tree.defs.hh	2015-02-26 11:11:49.028547230 +0100
+@@ -28,6 +28,7 @@
+ 
+ #include "Coefficient.defs.hh"
+ #include <memory>
++#include <cstddef>
+ 
+ #ifndef PPL_CO_TREE_EXTRA_DEBUG
+ #ifdef PPL_ABI_BREAKING_EXTRA_DEBUG
+@@ -159,7 +160,7 @@
+ 
+     typedef std::bidirectional_iterator_tag iterator_category;
+     typedef const data_type value_type;
+-    typedef ptrdiff_t difference_type;
++    typedef std::ptrdiff_t difference_type;
+     typedef value_type* pointer;
+     typedef data_type_const_reference reference;
+ 
+@@ -314,7 +315,7 @@
+ 
+     typedef std::bidirectional_iterator_tag iterator_category;
+     typedef data_type value_type;
+-    typedef ptrdiff_t difference_type;
++    typedef std::ptrdiff_t difference_type;
+     typedef value_type* pointer;
+     typedef value_type& reference;
+ 
+--- a/src/CO_Tree.inlines.hh	2015-02-26 11:12:36.375213045 +0100
++++ b/src/CO_Tree.inlines.hh	2015-02-26 11:13:08.785212458 +0100
+@@ -24,6 +24,8 @@
+ #ifndef PPL_CO_Tree_inlines_hh
+ #define PPL_CO_Tree_inlines_hh 1
+ 
++#include <cstddef>
++
+ namespace Parma_Polyhedra_Library {
+ 
+ inline dimension_type
+@@ -31,7 +33,7 @@
+   PPL_ASSERT(itr.current_index != 0);
+   PPL_ASSERT(itr.current_index >= indexes + 1);
+   PPL_ASSERT(itr.current_index <= indexes + reserved_size);
+-  const ptrdiff_t index = itr.current_index - indexes;
++  const std::ptrdiff_t index = itr.current_index - indexes;
+   return static_cast<dimension_type>(index);
+ }
+ 
+@@ -40,7 +42,7 @@
+   PPL_ASSERT(itr.current_index != 0);
+   PPL_ASSERT(itr.current_index >= indexes + 1);
+   PPL_ASSERT(itr.current_index <= indexes + reserved_size);
+-  const ptrdiff_t index = itr.current_index - indexes;
++  const std::ptrdiff_t index = itr.current_index - indexes;
+   return static_cast<dimension_type>(index);
+ }
+ 
+@@ -768,7 +770,7 @@
+   p -= (offset - 1);
+   while (*p == unused_index)
+     ++p;
+-  ptrdiff_t distance = p - tree.indexes;
++  std::ptrdiff_t distance = p - tree.indexes;
+   PPL_ASSERT(distance >= 0);
+   i = static_cast<dimension_type>(distance);
+   offset = least_significant_one_mask(i);
+@@ -783,7 +785,7 @@
+   p += (offset - 1);
+   while (*p == unused_index)
+     --p;
+-  ptrdiff_t distance = p - tree.indexes;
++  std::ptrdiff_t distance = p - tree.indexes;
+   PPL_ASSERT(distance >= 0);
+   i = static_cast<dimension_type>(distance);
+   offset = least_significant_one_mask(i);
+--- a/src/CO_Tree.cc	2015-02-26 11:14:43.581877415 +0100
++++ b/src/CO_Tree.cc	2015-02-26 11:15:13.621876875 +0100
+@@ -23,6 +23,7 @@
+ 
+ #include "ppl-config.h"
+ #include "CO_Tree.defs.hh"
++#include <cstddef>
+ 
+ namespace PPL = Parma_Polyhedra_Library;
+ 
+@@ -933,7 +934,7 @@
+     --subtree_size;
+   }
+ 
+-  ptrdiff_t distance = first_unused_index - indexes;
++  std::ptrdiff_t distance = first_unused_index - indexes;
+   PPL_ASSERT(distance >= 0);
+   return static_cast<dimension_type>(distance);
+ }
+--- a/src/Linear_Expression_Interface.defs.hh	2015-02-26 11:21:18.191870300 +0100
++++ b/src/Linear_Expression_Interface.defs.hh	2015-02-26 11:21:39.511869915 +0100
+@@ -32,6 +32,7 @@
+ #include "Sparse_Row.types.hh"
+ #include <vector>
+ #include <set>
++#include <cstddef>
+ 
+ #ifdef PPL_DOXYGEN_INCLUDE_IMPLEMENTATION_DETAILS
+ //! A linear expression.
+@@ -65,7 +66,7 @@
+   public:
+     typedef std::bidirectional_iterator_tag iterator_category;
+     typedef const Coefficient value_type;
+-    typedef ptrdiff_t difference_type;
++    typedef std::ptrdiff_t difference_type;
+     typedef value_type* pointer;
+     typedef Coefficient_traits::const_reference reference;
+ 

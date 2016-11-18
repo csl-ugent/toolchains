@@ -1,0 +1,28 @@
+--- a/sysdeps/i386/stpcpy.S	2014-01-27 14:21:14.385204448 +0100
++++ b/sysdeps/i386/stpcpy.S	2014-01-27 14:23:37.945210226 +0100
+@@ -43,17 +43,20 @@
+ 	subl %eax, %ecx		/* magic: reduce number of loop variants
+ 				   to one using addressing mode */
+ 
+-	/* Here we would like to write
++	/* Here we would like to write */
+ 
+ 	subl $4, %eax
+ 	ALIGN (4)
+-
++        /*
+ 	but the assembler is too smart and optimizes for the shortest
+ 	form where the number only needs one byte.  But if we could
+-	have the long form we would not need the alignment.  */
++	have the long form we would not need the alignment.  
++        
++        For Diablo, we can't have data in the middle of code however
++        */
+ 
+-	.byte 0x81, 0xe8	/* This is `subl $0x00000004, %eax' */
+-	.long 0x00000004
++	/*.byte 0x81, 0xe8*/	/* This is `subl $0x00000004, %eax' */
++	/*.long 0x00000004*/
+ 
+ 	/* Four times unfolded loop with only one loop counter.  This
+ 	   is achieved by the use of index+base addressing mode.  As the

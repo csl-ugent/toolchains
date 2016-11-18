@@ -1,0 +1,46 @@
+# paths to the toolchain and diablo
+DIABLOPATH = ~/diablo/diablo
+TCPATH = ~/diablo/toolchains/linux/armv7/g481b2232
+LLVMTCPATH = ~/diablo/toolchains/linux/llvm34
+BINUTILSPREFIX = arm-diablo-linux-gnueabi
+
+# gcc options
+GCC_PREFIX = $(TCPATH)/bin/$(BINUTILSPREFIX)-
+CFLAGS = -O0 -march=armv7-a -mtune=cortex-a8 -save-temps -Wl,--no-merge-exidx-entries -Wl,--no-demangle -Wl
+
+# diablo options
+DFLAGS = -S
+DIABLO = $(DIABLOPATH)/build/diablo-arm
+
+# clang options
+CLANGFLAGS = -isysroot $(TCPATH)/$(BINUTILSPREFIX)/sysroot -no-integrated-as -gcc-toolchain $(TCPATH) -ccc-gcc-name ${BINUTILSPREFIX} -target ${BINUTILSPREFIX}
+CLANG_PREFIX = $(LLVMTCPATH)/bin/
+
+# compile all *.c files in the local directory
+SRC=$(wildcard *.c)
+
+.PHONY: clanginfo gcc clean diablo clang gccinfo
+
+all: gcc
+
+clang: $(SRC)
+	$(CLANG_PREFIX)clang $(CLANGFLAGS) $^ -o $(basename $^) $(CFLAGS),-Map,$(basename $^).map
+	$(GCC_PREFIX)objdump -d $(basename $^) > $(basename $^).dump
+
+clanginfo:
+	$(CLANG_PREFIX)clang --version
+
+gccinfo:
+	$(GCC_PREFIX)gcc --version
+
+diablo: $(basename $(SRC))
+	$(DIABLO) $(DFLAGS) -o $(basename $^)_rewritten$(D_EXC_EXT) $^
+
+gcc: $(SRC)
+	$(GCC_PREFIX)gcc -o $(basename $^) $^ $(CFLAGS),-Map,$(basename $^).map
+	$(GCC_PREFIX)objdump -d $(basename $^) > $(basename $^).dump
+
+clean:
+	@rm -f *.s *.o *.map *.dump *.i *.out *.list
+	@rm -f $(basename $(SRC))
+	@rm -f $(basename $(SRC))_rewritten

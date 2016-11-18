@@ -1,0 +1,18 @@
+#! /bin/bash
+set -e
+
+package_dir=VAR_PACKAGE_DIR
+compiler=VAR_COMPILER
+
+case "$1" in
+    configure)
+	update-alternatives --quiet --install /opt/diablo-$compiler-toolchain diablo-$compiler-toolchain /opt/diablo-toolchains/$package_dir 50
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 0
+    ;;
+esac
+exit 0

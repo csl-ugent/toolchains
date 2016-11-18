@@ -1,0 +1,347 @@
+diff -ru a/gcc/cfgbuild.c b/gcc/cfgbuild.c
+--- a/gcc/cfgbuild.c	2014-01-02 23:23:26.000000000 +0100
++++ b/gcc/cfgbuild.c	2016-02-09 08:56:54.033741289 +0100
+@@ -64,6 +64,9 @@
+     case NOTE:
+       return false;
+ 
++    case DIABLO_SWITCHINS:
++      return false;
++
+     default:
+       gcc_unreachable ();
+     }
+@@ -114,6 +117,9 @@
+ 	 this may happen.  */
+       return false;
+ 
++    case DIABLO_SWITCHINS:
++      return false;
++
+     default:
+       gcc_unreachable ();
+     }
+diff -ru a/gcc/cfgrtl.c b/gcc/cfgrtl.c
+--- a/gcc/cfgrtl.c	2015-01-09 22:36:10.000000000 +0100
++++ b/gcc/cfgrtl.c	2016-02-09 08:56:54.033741289 +0100
+@@ -4181,6 +4181,11 @@
+ 	      gcc_unreachable ();
+ 	    }
+ 	  break;
++
++        case DIABLO_SWITCHINS:
++          emit_diablo_switchins_copy(insn);
++          break;
++
+ 	default:
+ 	  gcc_unreachable ();
+ 	}
+diff -ru a/gcc/emit-rtl.c b/gcc/emit-rtl.c
+--- a/gcc/emit-rtl.c	2014-09-09 13:42:34.000000000 +0200
++++ b/gcc/emit-rtl.c	2016-02-09 08:56:54.033741289 +0100
+@@ -2359,6 +2359,16 @@
+ 			     NULL, label_num++, NULL);
+ }
+ 
++
++static uint32_t diablo_switchins_num = 0;
++
++rtx
++gen_diablo_switchins (void)
++{
++  return gen_rtx_DIABLO_SWITCHINS (VOIDmode, 0, NULL_RTX, NULL_RTX, NULL,
++                                   diablo_switchins_num++, 0);
++}
++
+ /* For procedure integration.  */
+ 
+ /* Install new pointers to the first and last insns in the chain.
+@@ -4869,6 +4879,27 @@
+   return jump_table_data;
+ }
+ 
++rtx
++emit_diablo_switchins(rtx a)
++{
++  gcc_checking_assert (INSN_UID (a) == 0);
++  INSN_UID(a) = cur_insn_uid++;
++  add_insn(a);
++  return a;
++}
++
++rtx
++emit_diablo_switchins_copy(rtx orig)
++{
++  rtx ret = gen_diablo_switchins();
++  DIABLO_SWITCHINS_TABLEID(ret) = DIABLO_SWITCHINS_TABLEID(orig);
++
++  INSN_UID(ret) = cur_insn_uid++;
++  add_insn(ret);
++
++  return ret;
++}
++
+ /* Make an insn of code BARRIER
+    and add it to the end of the doubly-linked list.  */
+ 
+diff -ru a/gcc/emit-rtl.h b/gcc/emit-rtl.h
+--- a/gcc/emit-rtl.h	2014-08-15 23:23:21.000000000 +0200
++++ b/gcc/emit-rtl.h	2016-02-09 08:57:53.928624868 +0100
+@@ -119,4 +119,11 @@
+ 
+ extern void set_decl_incoming_rtl (tree, rtx, bool);
+ 
++rtx
++emit_diablo_switchins(rtx a);
++rtx
++gen_diablo_switchins (void);
++rtx
++emit_diablo_switchins_copy(rtx orig);
++
+ #endif /* GCC_EMIT_RTL_H */
+diff -ru a/gcc/final.c b/gcc/final.c
+--- a/gcc/final.c	2014-02-18 22:16:21.000000000 +0100
++++ b/gcc/final.c	2016-02-09 08:56:54.037741477 +0100
+@@ -1126,7 +1126,8 @@
+       INSN_ADDRESSES (uid) = insn_current_address + insn_lengths[uid];
+ 
+       if (NOTE_P (insn) || BARRIER_P (insn)
+-	  || LABEL_P (insn) || DEBUG_INSN_P (insn))
++	  || LABEL_P (insn) || DEBUG_INSN_P (insn)
++          || DIABLO_P(insn))
+ 	continue;
+       if (INSN_DELETED_P (insn))
+ 	continue;
+@@ -2350,6 +2351,14 @@
+     case BARRIER:
+       break;
+ 
++    case DIABLO_SWITCHINS:
++    {
++        char diablobuf[128];
++        sprintf(diablobuf, "DiabloSwitchIns%d_", DIABLO_SWITCHINS_ID(insn));
++        targetm.asm_out.internal_label (file, diablobuf, DIABLO_SWITCHINS_TABLEID(insn));
++    }
++      break;
++
+     case CODE_LABEL:
+       /* The target port might emit labels in the output function for
+ 	 some insn, e.g. sh.c output_branchy_insn.  */
+@@ -2408,6 +2417,10 @@
+ 	  else
+ 	    switch_to_section (current_function_section ());
+ 
++          char diablobuf[128];
++          sprintf(diablobuf, "DiabloSwitchTable%d_", CODE_LABEL_NUMBER(insn));
++          targetm.asm_out.internal_label (file, diablobuf, XVECLEN (PATTERN(next), GET_CODE (PATTERN(next)) == ADDR_DIFF_VEC));
++
+ #ifdef ASM_OUTPUT_CASE_LABEL
+ 	  ASM_OUTPUT_CASE_LABEL (file, "L", CODE_LABEL_NUMBER (insn),
+ 				 next);
+diff -ru a/gcc/haifa-sched.c b/gcc/haifa-sched.c
+--- a/gcc/haifa-sched.c	2014-10-01 16:42:46.000000000 +0200
++++ b/gcc/haifa-sched.c	2016-02-09 08:56:54.041741668 +0100
+@@ -1886,6 +1886,7 @@
+ /* Index POINT gives the instruction at point POINT of the model schedule.
+    This array doesn't change during main scheduling.  */
+ static vec<rtx> model_schedule;
++static vec<rtx> diablo_insns;
+ 
+ /* The list of instructions in the model worklist, sorted in order of
+    decreasing priority.  */
+@@ -5888,6 +5889,36 @@
+       && sched_pressure != SCHED_PRESSURE_MODEL)
+     find_modifiable_mems (head, tail);
+ 
++ int nr_diablo_ins = 0;
++/* unlink diablo switch instructions */
++ {
++        rtx b;
++        for (b = head; b != NEXT_INSN(tail); b = NEXT_INSN(b))
++          if (GET_CODE(b) == DIABLO_SWITCHINS)
++               nr_diablo_ins++;
++
++        if (nr_diablo_ins > 0) {
++                diablo_insns.create(nr_diablo_ins);
++
++                for (b = head; b != NEXT_INSN(tail); b = NEXT_INSN(b)) {
++                        if (DIABLO_P(b)) {
++                        	gcc_assert(GET_CODE(b) == DIABLO_SWITCHINS);
++                                rtx p = PREV_INSN(b);
++                                rtx n = NEXT_INSN(b);
++
++                                NEXT_INSN(p) = n;
++                                PREV_INSN(n) = p;
++
++                                if (b == head)
++                                        head = n;
++                                gcc_assert(b != tail);
++
++                                diablo_insns.quick_push(b);
++                        }
++                }
++        }
++}
++
+   /* We used to have code to avoid getting parameters moved from hard
+      argument registers into pseudos.
+ 
+@@ -6498,6 +6529,28 @@
+ 
+   head = restore_other_notes (head, NULL);
+ 
++  if (nr_diablo_ins > 0)
++  {
++   rtx diablo_insn;
++   unsigned int i;
++
++   FOR_EACH_VEC_ELT(diablo_insns, i, diablo_insn) {
++                rtx n = NEXT_INSN(diablo_insn);
++                rtx p = PREV_INSN(n);
++
++                NEXT_INSN(diablo_insn) = n;
++                PREV_INSN(diablo_insn) = p;
++
++                NEXT_INSN(p) = diablo_insn;
++                PREV_INSN(n) = diablo_insn;
++
++                if (head == n)
++                        head = diablo_insn;
++        }
++    diablo_insns.release();
++  }
++
++
+   current_sched_info->head = head;
+   current_sched_info->tail = tail;
+ 
+@@ -7205,7 +7258,7 @@
+ static int
+ haifa_luid_for_non_insn (rtx x)
+ {
+-  gcc_assert (NOTE_P (x) || LABEL_P (x));
++  gcc_assert (NOTE_P (x) || LABEL_P (x) || DIABLO_P(x));
+ 
+   return 0;
+ }
+diff -ru a/gcc/jump.c b/gcc/jump.c
+--- a/gcc/jump.c	2015-02-01 18:37:06.000000000 +0100
++++ b/gcc/jump.c	2016-02-09 08:56:54.041741668 +0100
+@@ -328,6 +328,8 @@
+ 	{
+ 	  if (INSN_DELETED_P (insn))
+ 	    ;
++          else if (DIABLO_P(insn))
++                ;
+ 	  else if (LABEL_P (insn))
+ 	    prev_nonjump_insn = NULL;
+ 	  else if (JUMP_TABLE_DATA_P (insn))
+diff -ru a/gcc/rtl.def b/gcc/rtl.def
+--- a/gcc/rtl.def	2014-01-02 23:23:26.000000000 +0100
++++ b/gcc/rtl.def	2016-02-09 08:56:54.041741668 +0100
+@@ -764,6 +764,8 @@
+    been optimized away completely.  */
+ DEF_RTL_EXPR(DEBUG_PARAMETER_REF, "debug_parameter_ref", "t", RTX_OBJ)
+ 
++DEF_RTL_EXPR(DIABLO_SWITCHINS, "diablo_switchins", "iuuBii", RTX_EXTRA)
++
+ /* All expressions from this point forward appear only in machine
+    descriptions.  */
+ #ifdef GENERATOR_FILE
+diff -ru a/gcc/rtl.h b/gcc/rtl.h
+--- a/gcc/rtl.h	2014-01-23 09:24:38.000000000 +0100
++++ b/gcc/rtl.h	2016-02-09 08:56:54.041741668 +0100
+@@ -441,6 +441,8 @@
+ /* Predicate yielding nonzero iff X is a label insn.  */
+ #define LABEL_P(X) (GET_CODE (X) == CODE_LABEL)
+ 
++#define DIABLO_P(X) (GET_CODE(X) == DIABLO_SWITCHINS)
++
+ /* Predicate yielding nonzero iff X is a jump insn.  */
+ #define JUMP_P(X) (GET_CODE (X) == JUMP_INSN)
+ 
+@@ -842,6 +844,9 @@
+    -1 means this instruction has not been recognized yet.  */
+ #define INSN_CODE(INSN) XINT (INSN, 6)
+ 
++#define DIABLO_SWITCHINS_ID(X) XINT(X, 4)
++#define DIABLO_SWITCHINS_TABLEID(X) XINT(X, 5)
++
+ #define RTX_FRAME_RELATED_P(RTX)					\
+   (RTL_FLAG_CHECK6 ("RTX_FRAME_RELATED_P", (RTX), DEBUG_INSN, INSN,	\
+ 		    CALL_INSN, JUMP_INSN, BARRIER, SET)->frame_related)
+diff -ru a/gcc/sched-rgn.c b/gcc/sched-rgn.c
+--- a/gcc/sched-rgn.c	2014-02-24 06:57:02.000000000 +0100
++++ b/gcc/sched-rgn.c	2016-02-09 08:56:54.045741854 +0100
+@@ -2479,10 +2479,10 @@
+ #endif
+ 		 || (!reload_completed
+ 		     && sets_likely_spilled (PATTERN (insn)))))
+-	 || NOTE_P (insn)
++	 || NOTE_P (insn) || DIABLO_P(insn)
+ 	 || (last != 0 && SCHED_GROUP_P (last)))
+     {
+-      if (!NOTE_P (insn))
++      if (!NOTE_P (insn) && !DIABLO_P(insn))
+ 	{
+ 	  if (last != 0
+ 	      && sd_find_dep_between (insn, last, false) == NULL)
+@@ -2514,7 +2514,7 @@
+ 	insn = prev_nonnote_insn (insn);
+ 
+ 	if (bitmap_bit_p (insn_referenced, INSN_LUID (insn))
+-	    || DEBUG_INSN_P (insn))
++	    || DEBUG_INSN_P (insn) || DIABLO_P(insn))
+ 	  continue;
+ 
+ 	if (! sched_insns_conditions_mutex_p (last, insn))
+diff -ru a/gcc/stmt.c b/gcc/stmt.c
+--- a/gcc/stmt.c	2014-01-02 23:23:26.000000000 +0100
++++ b/gcc/stmt.c	2016-02-09 08:56:54.045741854 +0100
+@@ -60,6 +60,8 @@
+ #include "params.h"
+ #include "dumpfile.h"
+ 
++static rtx diablo_table_label = NULL_RTX;
++
+ 
+ /* Functions and data structures for expanding case statements.  */
+ 
+@@ -1100,6 +1102,7 @@
+     }
+   /* Output the table.  */
+   emit_label (table_label);
++  diablo_table_label = table_label;
+ 
+   if (CASE_VECTOR_PC_RELATIVE || flag_pic)
+     emit_jump_table_data (gen_rtx_ADDR_DIFF_VEC (CASE_VECTOR_MODE,
+@@ -1278,10 +1281,14 @@
+     emit_case_decision_tree (index_expr, index_type,
+                              case_list, default_label,
+                              default_prob);
+-  else
++  else {
++    rtx diablo_switchins = gen_diablo_switchins();
++    emit_label_after(diablo_switchins, before_case);
+     emit_case_dispatch_table (index_expr, index_type,
+ 			      case_list, default_label,
+ 			      minval, maxval, range, bb);
++    DIABLO_SWITCHINS_TABLEID(diablo_switchins) = CODE_LABEL_NUMBER(diablo_table_label);
++  }
+ 
+   reorder_insns (NEXT_INSN (before_case), get_last_insn (), before_case);
+ 
+@@ -1370,10 +1377,13 @@
+ 	  case_list = add_case_node (case_list, low, low, lab, 0, case_node_pool);
+ 	}
+ 
++      rtx diablo_switchins = gen_diablo_switchins();
++      emit_label_after(diablo_switchins, before_case);
+       emit_case_dispatch_table (index_expr, index_type,
+ 				case_list, default_label,
+ 				minval, maxval, range,
+                                 BLOCK_FOR_INSN (before_case));
++      DIABLO_SWITCHINS_TABLEID(diablo_switchins) = CODE_LABEL_NUMBER(diablo_table_label);
+       emit_label (default_label);
+       free_alloc_pool (case_node_pool);
+     }

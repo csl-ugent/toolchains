@@ -1,0 +1,14 @@
+--- a/ports/sysdeps/arm/preconfigure	2014-04-01 15:05:25.048549320 +0200
++++ b/ports/sysdeps/arm/preconfigure	2014-04-01 15:31:18.156537730 +0200
+@@ -35,6 +35,11 @@
+ 		  ;;
+ 		esac
+ 
++                # the armv7 code is always thumb, override if we're generating arm
++                if `echo $CFLAGS | grep -q -- -marm`; then
++                  machine=arm
++                fi
++
+ 		machine=arm/$machine
+ 		if [ "${CFLAGS+set}" != "set" ]; then
+ 		  CFLAGS="-g -O2"

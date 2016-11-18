@@ -1,0 +1,47 @@
+diff --git a/build/tools/build-llvm.sh b/build/tools/build-llvm.sh
+index 6f36804..d9d0f5f 100755
+--- a/build/tools/build-llvm.sh
++++ b/build/tools/build-llvm.sh
+@@ -60,6 +60,19 @@ register_jobs_option
+ register_canadian_option
+ register_try64_option
+ 
++EXPLICIT_BINUTILS_VERSION=
++register_option "--binutils-version=<version>" do_binutils_version "Specify binutils version" "$BINUTILS_VERSION"
++do_binutils_version () {
++    BINUTILS_VERSION=$1
++    EXPLICIT_BINUTILS_VERSION=true
++}
++
++DIABLO_TC_VER=DiabloTC-none
++register_option "--diablotc-version=<diablotc version>" do_diablotc_version "Specify Diablo toolchains version" "$DIABLO_TC_VER"
++do_diablotc_version () {
++    DIABLO_TC_VER=$1
++}
++
+ extract_parameters "$@"
+ 
+ prepare_canadian_toolchain /tmp/ndk-$USER/build
+@@ -165,8 +178,8 @@ if [ "$MINGW" = "yes" -o "$HOST_TAG" = "linux-x86" ]; then
+     LDFLAGS_FOR_BUILD=$LDFLAGS_FOR_BUILD" -static-libgcc -static-libstdc++"
+ fi
+
+-CFLAGS="$CFLAGS $CFLAGS_FOR_BUILD $HOST_CFLAGS"
+-CXXFLAGS="$CXXFLAGS $CFLAGS_FOR_BUILD $HOST_CFLAGS"  # polly doesn't look at CFLAGS !
++CFLAGS="$CFLAGS $CFLAGS_FOR_BUILD $HOST_CFLAGS -DDIABLO_TC_REV=\\\"$DIABLO_TC_VER\\\""
++CXXFLAGS="$CXXFLAGS $CFLAGS_FOR_BUILD $HOST_CFLAGS -DDIABLO_TC_REV=\\\"$DIABLO_TC_VER\\\""  # polly doesn't look at CFLAGS !
+ LDFLAGS="$LDFLAGS $LDFLAGS_FOR_BUILD $HOST_LDFLAGS"
+ export CC CXX CFLAGS CXXFLAGS LDFLAGS CFLAGS_FOR_BUILD LDFLAGS_FOR_BUILD REQUIRES_RTTI=1 ARCH
+
+@@ -267,7 +280,10 @@ if [ "$USE_PYTHON" != "yes" ]; then
+     export LLVM_TOOLS_FILTER="PARALLEL_DIRS:=\$\$(PARALLEL_DIRS:%=% ndk-bc2native)"
+ fi
+ 
+-BINUTILS_VERSION=$(get_default_binutils_version_for_llvm $TOOLCHAIN)
++if [ -z $EXPLICIT_BINUTILS_VERSION ]; then
++    BINUTILS_VERSION=$(get_default_binutils_version_for_llvm $TOOLCHAIN)
++    dump "Auto-config: --binutils-version=$BINUTILS_VERSION"
++fi
+ 
+ run $SRC_DIR/$TOOLCHAIN/llvm/configure \
+     --prefix=$TOOLCHAIN_BUILD_PREFIX \

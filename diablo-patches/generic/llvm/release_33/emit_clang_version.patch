@@ -1,0 +1,54 @@
+diff --git a/tools/clang/lib/CodeGen/CodeGenModule.cpp b/tools/clang/lib/CodeGen/CodeGenModule.cpp
+index 0b03a3c..244eff2 100644
+--- a/tools/clang/lib/CodeGen/CodeGenModule.cpp
++++ b/tools/clang/lib/CodeGen/CodeGenModule.cpp
+@@ -35,6 +35,7 @@
+ #include "clang/Basic/Module.h"
+ #include "clang/Basic/SourceManager.h"
+ #include "clang/Basic/TargetInfo.h"
++#include "clang/Basic/Version.h"
+ #include "clang/Frontend/CodeGenOptions.h"
+ #include "llvm/ADT/APSInt.h"
+ #include "llvm/ADT/Triple.h"
+@@ -200,6 +201,8 @@ void CodeGenModule::Release() {
+ 
+   if (DebugInfo)
+     DebugInfo->finalize();
++
++  EmitVersionIdentMetadata();
+ }
+ 
+ void CodeGenModule::UpdateCompletedType(const TagDecl *TD) {
+@@ -3032,6 +3035,18 @@ void CodeGenFunction::EmitDeclMetadata() {
+   }
+ }
+ 
++void CodeGenModule::EmitVersionIdentMetadata() {
++  llvm::NamedMDNode *IdentMetadata =
++    TheModule.getOrInsertNamedMetadata("llvm.ident");
++  std::string Version = getClangFullVersion();
++  llvm::LLVMContext &Ctx = TheModule.getContext();
++
++  llvm::Value *IdentNode[] = {
++    llvm::MDString::get(Ctx, Version)
++  };
++  IdentMetadata->addOperand(llvm::MDNode::get(Ctx, IdentNode));
++}
++
+ void CodeGenModule::EmitCoverageFile() {
+   if (!getCodeGenOpts().CoverageFile.empty()) {
+     if (llvm::NamedMDNode *CUNode = TheModule.getNamedMetadata("llvm.dbg.cu")) {
+diff --git a/tools/clang/lib/CodeGen/CodeGenModule.h b/tools/clang/lib/CodeGen/CodeGenModule.h
+index 91138c6..91415d5 100644
+--- a/tools/clang/lib/CodeGen/CodeGenModule.h
++++ b/tools/clang/lib/CodeGen/CodeGenModule.h
+@@ -1086,6 +1086,9 @@ private:
+ 
+   void EmitDeclMetadata();
+ 
++  /// \brief Emit the Clang version as llvm.ident metadata
++  void EmitVersionIdentMetadata();
++
+   /// EmitCoverageFile - Emit the llvm.gcov metadata used to tell LLVM where
+   /// to emit the .gcno and .gcda files in a way that persists in .bc files.
+   void EmitCoverageFile();

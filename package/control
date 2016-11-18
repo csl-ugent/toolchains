@@ -1,0 +1,10 @@
+Package: diablo-VAR_PACKAGE_DIR-toolchain
+Version: VAR_PACKAGE_VERSION
+Maintainer: Jens Van den Broeck <jens.vandenbroeck@ugent.be> 
+Section: devel
+Priority: optional
+Architecture: VAR_SYSTEM
+Description: Provides a cross-compilation toolchain producing Diablo compatible binaries.
+  A patched cross-compilation toolchain based on VAR_VERSIONS.
+  The target platform is the VAR_ARCH architecture. Binaries compiled with this toolchain
+  will have some small fixes necesarry for rewriting them with Diablo.
